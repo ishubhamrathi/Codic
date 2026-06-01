@@ -29,18 +29,4 @@ npm run dev
 
 Without env vars the app still works and stores the latest project in browser storage.
 
-## Spring Boot backend
 
-The frontend can already save directly to Supabase. The `backend/` folder is a starting point for a Java API when you want server-side auth, project ownership, or code-generation jobs.
-
-```bash
-cd backend
-mvn spring-boot:run
-```
-
-Configure:
-
-```text
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```

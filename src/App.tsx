@@ -14,12 +14,15 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Code2, Database, Download, MousePointer2, Save, Shapes, Sparkles } from 'lucide-react';
+import { Code2, Database, Download, LogOut, MousePointer2, Save, Shapes, Sparkles } from 'lucide-react';
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, loadLocalDiagram, saveDiagram } from './lib/supabase';
+import { isSupabaseConfigured, loadUserProjects, saveDiagram } from './lib/supabase';
+import { AuthProvider } from './lib/AuthContext';
+import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
+import { AuthPage } from './component/Auth';
 import type { DiagramSnapshot, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
 
 const initialNodes: UmlNode[] = [
@@ -69,6 +72,7 @@ const relationOptions: UmlRelationKind[] = [
 ];
 
 function Editor() {
+  const { user, signOut } = useAuth();
   const [projectId, setProjectId] = useState<string>();
   const [projectName, setProjectName] = useState('Untitled UML Project');
   const [nodes, setNodes, onNodesChange] = useNodesState<UmlNode>(initialNodes);
@@ -132,18 +136,23 @@ function Editor() {
     setStatus(isSupabaseConfigured ? 'Saved to Supabase' : 'Saved to browser storage');
   };
 
-  const loadSavedDiagram = () => {
-    const local = loadLocalDiagram();
-    if (!local) {
-      setStatus('No local diagram found');
-      return;
+  const loadSavedDiagram = async () => {
+    try {
+      const projects = await loadUserProjects();
+      if (!projects.length) {
+        setStatus('No saved projects found');
+        return;
+      }
+      const local = projects[0];
+      setProjectId(local.id);
+      setProjectName(local.name);
+      setNodes(local.nodes);
+      setEdges(local.edges);
+      setSelectedNodeId(local.nodes[0]?.id);
+      setStatus('Loaded project');
+    } catch {
+      setStatus('Failed to load projects');
     }
-    setProjectId(local.id);
-    setProjectName(local.name);
-    setNodes(local.nodes);
-    setEdges(local.edges);
-    setSelectedNodeId(local.nodes[0]?.id);
-    setStatus('Loaded local diagram');
   };
 
   const importText = () => {
@@ -184,6 +193,17 @@ function Editor() {
             <p>Visual design to Java class code.</p>
           </div>
         </div>
+
+        {user && (
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label>{user.email}</label>
+              <button onClick={signOut} style={{ padding: '4px 8px', minHeight: 'auto' }}>
+                <LogOut size={14} />
+              </button>
+            </div>
+          </section>
+        )}
 
         <section>
           <label>Project</label>
@@ -329,6 +349,34 @@ function Editor() {
 }
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100svh',
+        background: 'var(--bg)',
+      }}>
+        <p style={{ color: 'var(--muted)' }}>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user && isSupabaseConfigured) {
+    return <AuthPage />;
+  }
+
   return (
     <ReactFlowProvider>
       <Editor />
