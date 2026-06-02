@@ -775,14 +775,28 @@ label {
 @media (max-width: 900px) {
   .app-layout {
     grid-template-columns: 48px 1fr;
+    overflow: hidden;
+  }
+  .app-layout.no-side-panel,
+  .app-layout.inspector-collapsed,
+  .app-layout.no-side-panel.inspector-collapsed {
+    grid-template-columns: 48px 1fr;
   }
   .side-panel {
     position: fixed;
     top: 0;
     left: 48px;
     bottom: 0;
+    width: 260px;
     z-index: 50;
     box-shadow: var(--shadow);
+  }
+  .side-panel--hidden {
+    visibility: hidden;
+    width: 0;
+    border: none;
+    padding: 0;
+    pointer-events: none;
   }
   .inspector {
     position: fixed;
@@ -792,6 +806,32 @@ label {
     width: 300px;
     z-index: 50;
     box-shadow: -4px 0 20px rgba(0,0,0,0.08);
+    transform: translateX(0);
+    transition: transform 0.2s ease;
+  }
+  .inspector--collapsed {
+    transform: translateX(100%);
+    width: 300px;
+    padding: 12px;
+    overflow: visible;
+  }
+  .inspector-toggle {
+    position: absolute;
+    left: -32px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px 0 0 6px;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.06);
+  }
+  .topbar {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .topbar-status,
+  .topbar-dot {
+    display: none;
   }
 }
 
@@ -800,5 +840,8 @@ label {
     grid-template-columns: 1fr;
   }
   .activity-bar { display: none; }
-  .side-panel { left: 0; }
+  .side-panel { left: 0; width: 280px; }
+  .inspector { width: 100%; }
+  .inspector--collapsed { width: 100%; }
+  .inspector-toggle { left: -28px; }
 }

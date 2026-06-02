@@ -18,7 +18,7 @@ import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid } fr
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadFolders, loadUserTheme, saveUserTheme, type FolderData } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, type FolderData } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
@@ -292,31 +292,32 @@ function Editor() {
     let cancelled = false;
     (async () => {
       try {
-        if (!isSupabaseConfigured) return;
-        const [projects, folders] = await Promise.all([loadUserProjects(), loadFolders()]);
-        if (cancelled) return;
-        setAllProjects(projects);
-        setAllFolders(folders);
-        if (projects.length > 0) {
-          const latest = projects[0];
-          setProjectId(latest.id ?? crypto.randomUUID());
-          setProjectFolderId(latest.folderId);
-          setProjectName(latest.name);
-          setNodes(latest.nodes);
-          setEdges(latest.edges);
-          setSelectedNodeId(latest.nodes[0]?.id);
-          setRecentProjectId(latest.id);
-        } else {
-          const saved = await saveDiagram({
-            id: crypto.randomUUID(),
-            name: projectName,
-            nodes,
-            edges,
-            updatedAt: new Date().toISOString(),
-          });
-          setProjectId(saved.id);
-          setRecentProjectId(saved.id);
-          setExplorerRefreshKey((k) => k + 1);
+        if (isSupabaseConfigured) {
+          const [projects, folders] = await Promise.all([loadUserProjects(), loadFolders()]);
+          if (cancelled) return;
+          setAllProjects(projects);
+          setAllFolders(folders);
+          if (projects.length > 0) {
+            const latest = projects[0];
+            setProjectId(latest.id ?? crypto.randomUUID());
+            setProjectFolderId(latest.folderId);
+            setProjectName(latest.name);
+            setNodes(latest.nodes);
+            setEdges(latest.edges);
+            setSelectedNodeId(latest.nodes[0]?.id);
+            setRecentProjectId(latest.id);
+            return;
+          }
+        }
+        const local = loadLocalDiagram();
+        if (local) {
+          setProjectId(local.id ?? crypto.randomUUID());
+          setProjectFolderId(local.folderId);
+          setProjectName(local.name);
+          setNodes(local.nodes);
+          setEdges(local.edges);
+          setSelectedNodeId(local.nodes[0]?.id);
+          setRecentProjectId(local.id);
         }
       } finally {
         if (!cancelled) setDataLoading(false);
