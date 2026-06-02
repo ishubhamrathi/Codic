@@ -510,6 +510,108 @@ label {
   color: var(--muted);
   font-size: 10px;
 }
+.uml-node__section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.uml-node__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.uml-node__vis {
+  cursor: pointer;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+.uml-node__vis:hover { color: var(--accent); }
+.uml-node__editable {
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uml-node__editable:hover {
+  background: var(--accent-soft);
+  border-radius: 2px;
+}
+.uml-node__add {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 3px;
+  padding: 1px 4px;
+  min-height: auto;
+  min-width: auto;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.uml-node__add:hover { color: var(--accent); background: var(--accent-soft); }
+.uml-node__remove {
+  font-size: 10px;
+  color: var(--danger);
+  background: none;
+  border: none;
+  border-radius: 3px;
+  padding: 0 3px;
+  min-height: auto;
+  min-width: auto;
+  cursor: pointer;
+  line-height: 1;
+}
+.uml-node__remove:hover { background: var(--accent-soft); }
+
+.uml-node__placeholder {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.uml-node:hover .uml-node__placeholder {
+  opacity: 1;
+}
+.uml-node__add-hint {
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+}
+.uml-node__placeholder:hover .uml-node__add-hint {
+  color: var(--accent);
+}
+.uml-node__add-row {
+  opacity: 1;
+}
+
+.uml-inline-input {
+  font-family: "SF Mono", ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  padding: 0 3px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: var(--panel);
+  color: var(--text);
+  min-height: auto;
+  width: 100%;
+}
+.uml-inline-name {
+  font-weight: 600;
+  text-align: center;
+  font-size: 12px;
+}
+.uml-inline-add {
+  font-size: 10px;
+  padding: 0 3px;
+  min-height: 18px;
+}
 
 /* ── Inspector ──────────────────────────────────── */
 .inspector {
