@@ -1,15 +1,15 @@
 :root {
-  --bg: #f7f8fb;
-  --panel: #ffffff;
-  --panel-strong: #f1f5f9;
-  --text: #172033;
-  --muted: #64748b;
-  --border: #dbe3ee;
-  --accent: #2563eb;
-  --accent-soft: #e8f0ff;
+  --bg: #f5f0e8;
+  --panel: #faf7f2;
+  --panel-strong: #ede8de;
+  --text: #2c2416;
+  --muted: #7a6f5f;
+  --border: #d9d0c1;
+  --accent: #8b6914;
+  --accent-soft: #f0e6cc;
   --danger: #b91c1c;
-  --shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
-  --activity-bg: #f1f5f9;
+  --shadow: 0 14px 34px rgba(60, 40, 10, 0.08);
+  --activity-bg: #ede8de;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -17,6 +17,20 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1612;
+  --panel: #242018;
+  --panel-strong: #2e2a20;
+  --text: #e8e0d0;
+  --muted: #a09080;
+  --border: #3d3628;
+  --accent: #c9a84c;
+  --accent-soft: #3a3020;
+  --danger: #ef4444;
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  --activity-bg: #1e1a14;
 }
 
 * { box-sizing: border-box; }
@@ -41,7 +55,7 @@ button {
 button:hover { border-color: var(--accent); color: var(--accent); }
 
 input, select, textarea {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
@@ -107,7 +121,7 @@ label {
   min-height: auto;
 }
 .activity-btn:hover {
-  background: rgba(0,0,0,0.04);
+  background: var(--panel-strong);
   color: var(--text);
 }
 .activity-btn.active {
@@ -173,7 +187,7 @@ label {
   background: transparent;
 }
 .panel-icon-btn:hover {
-  background: rgba(0,0,0,0.06);
+  background: var(--panel-strong);
   color: var(--text);
 }
 
@@ -250,11 +264,52 @@ label {
 
 .panel-profile-badge {
   font-size: 11px;
-  background: #dcfce7;
-  color: #166534;
+  background: var(--accent-soft);
+  color: var(--accent);
   padding: 3px 10px;
   border-radius: 10px;
   font-weight: 500;
+}
+
+.panel-profile-theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 8px;
+}
+
+.theme-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--border);
+  border: none;
+  cursor: pointer;
+  min-height: auto;
+  min-width: auto;
+  padding: 0;
+  transition: background 0.2s;
+}
+.theme-toggle--dark {
+  background: var(--accent);
+}
+.theme-toggle__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  pointer-events: none;
+}
+.theme-toggle--dark .theme-toggle__knob {
+  transform: translateX(18px);
 }
 
 .panel-profile-signout {
@@ -273,7 +328,7 @@ label {
   color: var(--danger);
 }
 .panel-profile-signout:hover {
-  background: #fef2f2;
+  background: var(--accent-soft);
   border-color: var(--danger);
 }
 
@@ -290,10 +345,10 @@ label {
   user-select: none;
   color: var(--text);
 }
-.tree-item:hover { background: rgba(0,0,0,0.04); }
+.tree-item:hover { background: var(--panel-strong); }
 .tree-item--active { background: var(--accent-soft); }
-.tree-item--recent { background: #fef9c3; }
-.tree-item--recent:hover { background: #fef08a; }
+.tree-item--recent { background: var(--accent-soft); }
+.tree-item--recent:hover { background: var(--accent-soft); opacity: 0.8; }
 .tree-item--file { font-weight: 400; }
 
 .tree-label {
@@ -349,7 +404,7 @@ label {
 
 .topbar {
   align-items: center;
-  background: rgba(255,255,255,0.8);
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
@@ -404,7 +459,7 @@ label {
   color: var(--muted);
   background: transparent;
 }
-.topbar-btn:hover { background: rgba(0,0,0,0.04); color: var(--text); border-color: transparent; }
+.topbar-btn:hover { background: var(--panel-strong); color: var(--text); border-color: transparent; }
 
 .topbar-dot {
   font-size: 11px;
@@ -415,7 +470,7 @@ label {
 
 /* ── UML Nodes ─────────────────────────────────── */
 .uml-node {
-  background: #fff;
+  background: var(--panel);
   border: 1.5px solid var(--border);
   border-radius: 6px;
   min-width: 180px;
@@ -490,7 +545,7 @@ label {
   cursor: pointer;
 }
 .inspector-toggle:hover {
-  background: rgba(0,0,0,0.06);
+  background: var(--panel-strong);
   color: var(--text);
 }
 
@@ -505,9 +560,10 @@ label {
 }
 
 .code-panel pre {
-  background: #1e293b;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #e2e8f0;
+  color: var(--text);
   font-size: 11px;
   line-height: 1.5;
   margin: 0;
@@ -522,6 +578,46 @@ label {
 .react-flow__minimap {
   border: 1px solid var(--border);
   border-radius: 6px;
+}
+
+/* ── ReactFlow Dark Mode ───────────────────────── */
+[data-theme="dark"] .react-flow__background {
+  background-color: var(--bg) !important;
+}
+[data-theme="dark"] .react-flow__minimap {
+  background: var(--panel) !important;
+  border-color: var(--border);
+}
+[data-theme="dark"] .react-flow__minimap-mask {
+  fill: var(--accent-soft) !important;
+  fill-opacity: 0.6;
+}
+[data-theme="dark"] .react-flow__controls {
+  background: var(--panel) !important;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+[data-theme="dark"] .react-flow__controls-button {
+  background: var(--panel) !important;
+  border-color: var(--border) !important;
+  fill: var(--muted) !important;
+}
+[data-theme="dark"] .react-flow__controls-button:hover {
+  background: var(--panel-strong) !important;
+}
+[data-theme="dark"] .react-flow__edge-path {
+  stroke: var(--muted) !important;
+}
+[data-theme="dark"] .react-flow__handle {
+  background: var(--accent) !important;
+  border-color: var(--panel) !important;
+}
+[data-theme="dark"] .react-flow__attribution {
+  background: var(--panel) !important;
+}
+[data-theme="dark"] .react-flow__attribution a {
+  fill: var(--muted) !important;
 }
 
 /* ── Inspector Sections ──────────────────────────── */

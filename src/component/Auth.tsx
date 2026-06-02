@@ -254,6 +254,8 @@ export function AuthPage() {
               <label style={{ marginBottom: '6px' }}>Password</label>
               <input
                 type="password"
+                name="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

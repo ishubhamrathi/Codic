@@ -62,6 +62,27 @@ export const signOut = async () => {
   if (error) throw error;
 };
 
+export const loadUserTheme = async (): Promise<'light' | 'dark'> => {
+  if (!supabase) return 'light';
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 'light';
+  const { data } = await supabase
+    .from('user_profiles')
+    .select('theme')
+    .eq('id', user.id)
+    .single();
+  return (data?.theme === 'dark') ? 'dark' : 'light';
+};
+
+export const saveUserTheme = async (theme: 'light' | 'dark') => {
+  if (!supabase) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from('user_profiles')
+    .upsert({ id: user.id, theme }, { onConflict: 'id' });
+};
+
 export const onAuthChange = (callback: (session: Session | null) => void) => {
   if (!supabase) {
     callback(null);

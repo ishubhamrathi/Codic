@@ -18,13 +18,15 @@ import { Code2, Download, MousePointer2, Save, Shapes, Sparkles } from 'lucide-r
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram, loadUserProjects } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadUserTheme, saveUserTheme } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
 import { AuthPage } from './component/Auth';
 import { ProjectExplorer } from './component/ProjectExplorer';
 import type { DiagramSnapshot, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
+import { InheritanceEdge } from './component/edges/InheritanceEdge';
+import { CompositionEdge } from './component/edges/CompositionEdge';
 
 const initialNodes: UmlNode[] = [
   {
@@ -63,6 +65,7 @@ const initialEdges: UmlEdge[] = [
 ];
 
 const nodeTypes = { umlNode: UmlNodeCard };
+const edgeTypes = { inheritance: InheritanceEdge, composition: CompositionEdge };
 const relationOptions: UmlRelationKind[] = [
   'association',
   'aggregation',
@@ -113,6 +116,7 @@ function Editor() {
   const [activePanel, setActivePanel] = useState<'explorer' | 'profile' | null>('explorer');
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [inspectorCollapsed, setInspectorCollapsed] = useState<Record<string, boolean>>({
     inspector: false,
     textToVisual: false,
@@ -132,13 +136,16 @@ function Editor() {
     if (!targetId || targetId === selectedNodeId) return;
     const targetNode = nodes.find((n) => n.id === targetId);
     if (!targetNode) return;
+    const edgeType = (selectedRelation === 'inheritance' || selectedRelation === 'composition')
+      ? selectedRelation
+      : 'smoothstep';
     setEdges((current) =>
       addEdge(
         {
           id: `e-${selectedNodeId}-${targetId}`,
           source: selectedNodeId,
           target: targetId,
-          type: 'smoothstep' as const,
+          type: edgeType as any,
           label: selectedRelation,
           data: { relation: selectedRelation, label: selectedRelation },
         },
@@ -182,6 +189,25 @@ function Editor() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadUserTheme();
+      if (!cancelled) {
+        setTheme(saved);
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleTheme = async () => {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    await saveUserTheme(next);
+  };
+
   const userDisplayName = user?.user_metadata?.display_name
     || user?.email?.split('@')[0]
     || 'User';
@@ -189,11 +215,14 @@ function Editor() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      const edgeType = (selectedRelation === 'inheritance' || selectedRelation === 'composition')
+        ? selectedRelation
+        : 'smoothstep';
       setEdges((current) =>
         addEdge(
           {
             ...connection,
-            type: 'smoothstep' as const,
+            type: edgeType as any,
             label: selectedRelation,
             data: { relation: selectedRelation, label: selectedRelation },
           },
@@ -349,6 +378,16 @@ function Editor() {
                 <div className="panel-profile-meta">
                   <span className="panel-profile-badge">Authenticated</span>
                 </div>
+                <div className="panel-profile-theme">
+                  <span>Theme</span>
+                  <button
+                    className={`theme-toggle ${theme === 'dark' ? 'theme-toggle--dark' : ''}`}
+                    onClick={toggleTheme}
+                    title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                  >
+                    <span className="theme-toggle__knob" />
+                  </button>
+                </div>
                 <button className="panel-profile-signout" onClick={signOut}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" />
@@ -383,6 +422,7 @@ function Editor() {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
