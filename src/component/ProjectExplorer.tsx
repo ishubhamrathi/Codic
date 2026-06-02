@@ -92,9 +92,10 @@ type Props = {
   onCreateProject: (folderId?: string) => void;
   currentProjectId?: string;
   recentProjectId?: string;
+  refreshKey?: number;
 };
 
-export function ProjectExplorer({ onLoadProject, onCreateProject, currentProjectId, recentProjectId }: Props) {
+export function ProjectExplorer({ onLoadProject, onCreateProject, currentProjectId, recentProjectId, refreshKey }: Props) {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [projects, setProjects] = useState<DiagramSnapshot[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -104,6 +105,7 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, currentProject
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     (async () => {
       try {
         const [f, p] = await Promise.all([loadFolders(), loadUserProjects()]);
@@ -113,7 +115,7 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, currentProject
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]);
 
   const toggleFolder = (id: string) => {
     setExpandedFolders((prev) => {

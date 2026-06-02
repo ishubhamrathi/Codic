@@ -372,19 +372,17 @@ label {
 
 .topbar-center { flex: 1; display: flex; justify-content: center; }
 
-.project-name-input {
-  border: none;
-  background: transparent;
-  text-align: center;
+.topbar-project-name {
   font-size: 13px;
   font-weight: 500;
-  min-height: auto;
-  padding: 4px 8px;
-  border-radius: 4px;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   max-width: 280px;
+  padding: 4px 8px;
 }
-.project-name-input:hover { background: rgba(0,0,0,0.03); }
-.project-name-input:focus { background: #fff; outline: 1px solid var(--accent); }
 
 .topbar-right {
   display: flex;

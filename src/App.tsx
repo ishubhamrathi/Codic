@@ -112,6 +112,7 @@ function Editor() {
   const [recentProjectId, setRecentProjectId] = useState<string | undefined>();
   const [activePanel, setActivePanel] = useState<'explorer' | 'profile' | null>('explorer');
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
   const [inspectorCollapsed, setInspectorCollapsed] = useState<Record<string, boolean>>({
     inspector: false,
     textToVisual: false,
@@ -218,15 +219,25 @@ function Editor() {
     setStatus('Loaded project');
   };
 
-  const handleCreateProject = (folderId?: string) => {
+  const handleCreateProject = async (folderId?: string) => {
     const name = prompt('Project name:');
     if (!name) return;
-    setProjectId(crypto.randomUUID());
+    const id = crypto.randomUUID();
+    setProjectId(id);
     setProjectFolderId(folderId);
     setProjectName(name);
     setNodes([]);
     setEdges([]);
     setStatus('New project created');
+    await saveDiagram({
+      id,
+      folderId,
+      name,
+      nodes: [],
+      edges: [],
+      updatedAt: new Date().toISOString(),
+    });
+    setExplorerRefreshKey((k) => k + 1);
   };
 
   const importText = () => {
@@ -291,6 +302,7 @@ function Editor() {
               onCreateProject={handleCreateProject}
               currentProjectId={projectId}
               recentProjectId={recentProjectId}
+              refreshKey={explorerRefreshKey}
             />
           )}
           {activePanel === 'profile' && (
@@ -327,11 +339,7 @@ function Editor() {
             </div>
           </div>
           <div className="topbar-center">
-            <input
-              className="project-name-input"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-            />
+            <span className="topbar-project-name">{projectName}</span>
           </div>
           <div className="topbar-right">
             <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>
