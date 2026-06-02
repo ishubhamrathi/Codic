@@ -1,19 +1,49 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
 import { PrismaClient } from '../src/generated/prisma';
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_URL');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+app.use(cors({ origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json());
 
-app.get('/api/projects/:userId', async (req, res) => {
+type AuthRequest = Request & { userId?: string };
+
+async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+
+  const token = header.slice(7);
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  req.userId = user.id;
+  next();
+}
+
+app.get('/api/projects', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const projects = await prisma.umlProject.findMany({
-      where: { userId: req.params.userId },
+      where: { userId: req.userId },
       orderBy: { updatedAt: 'desc' },
     });
     res.json(projects);
@@ -22,13 +52,13 @@ app.get('/api/projects/:userId', async (req, res) => {
   }
 });
 
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { id, userId, name, nodes, edges } = req.body;
+    const { id, name, nodes, edges } = req.body;
     const project = await prisma.umlProject.upsert({
       where: { id: id || '' },
       update: { name, nodes, edges, updatedAt: new Date() },
-      create: { id, userId, name, nodes, edges },
+      create: { id, userId: req.userId!, name, nodes, edges },
     });
     res.json(project);
   } catch {
@@ -36,8 +66,12 @@ app.post('/api/projects', async (req, res) => {
   }
 });
 
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const project = await prisma.umlProject.findUnique({ where: { id: req.params.id } });
+    if (!project || project.userId !== req.userId) {
+      return res.status(404).json({ error: 'Not found' });
+    }
     await prisma.umlProject.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch {

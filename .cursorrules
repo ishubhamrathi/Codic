@@ -55,9 +55,21 @@ src/
 - Theme toggling via `data-theme` attribute on `<html>` and localStorage key `uml:theme`
 
 ## Environment Variables
-- `VITE_SUPABASE_URL` - Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
+- `VITE_SUPABASE_URL` - Supabase project URL (frontend, public)
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key (frontend, public by design)
 - If both are set, Supabase auth/persistence is used; otherwise falls back to localStorage
+
+### Server-only (never prefix with VITE_)
+- `DATABASE_URL` - PostgreSQL connection string
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key for JWT verification
+- `ALLOWED_ORIGIN` - CORS origin (default: http://localhost:5173)
+
+## Server Auth (server/index.ts)
+- Express server with Prisma, runs on PORT (default 3001)
+- `requireAuth` middleware verifies Supabase JWT from `Authorization: Bearer <token>` header
+- `req.userId` is set from the verified token — never trust client-sent userId
+- Routes: `GET /api/projects`, `POST /api/projects`, `DELETE /api/projects/:id`
+- All routes enforce ownership — users can only access their own projects
 
 ## Commands
 - `npm run dev` - Start dev server
