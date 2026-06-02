@@ -17,11 +17,17 @@ function InlineEdit({
   onCommit,
   className,
   placeholder,
+  onArrowUp,
+  onArrowDown,
+  onEnter,
 }: {
   value: string;
   onCommit: (v: string) => void;
   className?: string;
   placeholder?: string;
+  onArrowUp?: () => void;
+  onArrowDown?: () => void;
+  onEnter?: () => void;
 }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
@@ -40,8 +46,14 @@ function InlineEdit({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onCommit(draft)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); onCommit(draft); }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onCommit(draft);
+          if (onEnter) onEnter();
+        }
         if (e.key === 'Escape') onCommit(value);
+        if (e.key === 'ArrowUp' && onArrowUp) { e.preventDefault(); onCommit(draft); onArrowUp(); }
+        if (e.key === 'ArrowDown' && onArrowDown) { e.preventDefault(); onCommit(draft); onArrowDown(); }
       }}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
@@ -115,6 +127,35 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
     setEditing(null);
   };
 
+  const fieldCount = data.fields.length;
+  const methodCount = data.methods.length;
+  const enumCount = (data.enumValues ?? []).length;
+
+  const commitField = (idx: number, v: string) => {
+    const [name, type] = v.split(':');
+    const fields = [...data.fields];
+    fields[idx] = { ...fields[idx], name: name?.trim() || fields[idx].name, type: type?.trim() || fields[idx].type };
+    update({ fields });
+    setEditing(null);
+  };
+
+  const commitMethod = (idx: number, v: string) => {
+    const match = v.match(/^(.*?)\(\)\s*:\s*(.+)$/);
+    const name = match?.[1]?.trim() || data.methods[idx].name;
+    const type = match?.[2]?.trim() || data.methods[idx].type;
+    const methods = [...data.methods];
+    methods[idx] = { ...methods[idx], name, type };
+    update({ methods });
+    setEditing(null);
+  };
+
+  const commitEnum = (idx: number, v: string) => {
+    const enumValues = [...(data.enumValues ?? [])];
+    enumValues[idx] = (v || value).toUpperCase();
+    update({ enumValues });
+    setEditing(null);
+  };
+
   return (
     <div
       className={`uml-node ${selected ? 'selected' : ''}`}
@@ -144,9 +185,16 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
               {editing === `enum-${idx}` ? (
                 <InlineEdit
                   value={value}
+                  onArrowUp={idx > 0 ? () => setEditing(`enum-${idx - 1}`) : undefined}
+                  onArrowDown={idx < enumCount - 1
+                    ? () => setEditing(`enum-${idx + 1}`)
+                    : () => setAdding('enum')}
+                  onEnter={idx < enumCount - 1
+                    ? () => setEditing(`enum-${idx + 1}`)
+                    : () => setAdding('enum')}
                   onCommit={(v) => {
                     const enumValues = [...(data.enumValues ?? [])];
-                    enumValues[idx] = v || value;
+                    enumValues[idx] = (v || value).toUpperCase();
                     update({ enumValues });
                     setEditing(null);
                   }}
@@ -169,7 +217,7 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
               placeholder="New value"
               onCommit={(v) => {
                 if (v.trim()) {
-                  const enumValues = [...(data.enumValues ?? []), v.trim()];
+                  const enumValues = [...(data.enumValues ?? []), v.trim().toUpperCase()];
                   update({ enumValues });
                 }
                 setAdding(null);
@@ -201,13 +249,14 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
                 {editing === `field-${idx}` ? (
                   <InlineEdit
                     value={`${field.name}: ${field.type}`}
-                    onCommit={(v) => {
-                      const [name, type] = v.split(':');
-                      const fields = [...data.fields];
-                      fields[idx] = { ...field, name: name?.trim() || field.name, type: type?.trim() || field.type };
-                      update({ fields });
-                      setEditing(null);
-                    }}
+                    onArrowUp={idx > 0 ? () => setEditing(`field-${idx - 1}`) : undefined}
+                    onArrowDown={idx < fieldCount - 1
+                      ? () => setEditing(`field-${idx + 1}`)
+                      : () => setAdding('fields')}
+                    onEnter={idx < fieldCount - 1
+                      ? () => setEditing(`field-${idx + 1}`)
+                      : () => setAdding('fields')}
+                    onCommit={(v) => commitField(idx, v)}
                   />
                 ) : (
                   <span
@@ -257,15 +306,14 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
                 {editing === `method-${idx}` ? (
                   <InlineEdit
                     value={`${method.name}(): ${method.type}`}
-                    onCommit={(v) => {
-                      const match = v.match(/^(.*?)\(\)\s*:\s*(.+)$/);
-                      const name = match?.[1]?.trim() || method.name;
-                      const type = match?.[2]?.trim() || method.type;
-                      const methods = [...data.methods];
-                      methods[idx] = { ...method, name, type };
-                      update({ methods });
-                      setEditing(null);
-                    }}
+                    onArrowUp={idx > 0 ? () => setEditing(`method-${idx - 1}`) : undefined}
+                    onArrowDown={idx < methodCount - 1
+                      ? () => setEditing(`method-${idx + 1}`)
+                      : () => setAdding('methods')}
+                    onEnter={idx < methodCount - 1
+                      ? () => setEditing(`method-${idx + 1}`)
+                      : () => setAdding('methods')}
+                    onCommit={(v) => commitMethod(idx, v)}
                   />
                 ) : (
                   <span

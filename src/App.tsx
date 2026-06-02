@@ -14,7 +14,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Code2, Download, MousePointer2, Save, Shapes, Sparkles } from 'lucide-react';
+import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid } from 'lucide-react';
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
@@ -75,6 +75,78 @@ const relationOptions: UmlRelationKind[] = [
   'dependency',
 ];
 
+function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
+  if (nodes.length === 0) return nodes;
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const children = new Map<string, Set<string>>();
+  const parents = new Map<string, Set<string>>();
+
+  nodes.forEach((n) => {
+    children.set(n.id, new Set());
+    parents.set(n.id, new Set());
+  });
+
+  edges.forEach((e) => {
+    if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
+      children.get(e.source)!.add(e.target);
+      parents.get(e.target)!.add(e.source);
+    }
+  });
+
+  const roots = nodes.filter((n) => parents.get(n.id)!.size === 0);
+  const visited = new Set<string>();
+  const levels: string[][] = [];
+
+  function bfs(startIds: string[]) {
+    let queue = startIds;
+    while (queue.length > 0) {
+      levels.push([...queue]);
+      const next: string[] = [];
+      for (const id of queue) {
+        visited.add(id);
+        for (const child of children.get(id) ?? []) {
+          if (!visited.has(child)) {
+            next.push(child);
+          }
+        }
+      }
+      queue = next;
+    }
+  }
+
+  bfs(roots.map((n) => n.id));
+
+  const unvisited = nodes.filter((n) => !visited.has(n.id));
+  if (unvisited.length > 0) {
+    bfs(unvisited.map((n) => n.id));
+  }
+
+  const NODE_W = 200;
+  const NODE_H = 160;
+  const GAP_X = 60;
+  const GAP_Y = 100;
+
+  const arranged = new Map<string, { x: number; y: number }>();
+
+  levels.forEach((level, levelIdx) => {
+    const totalWidth = level.length * NODE_W + (level.length - 1) * GAP_X;
+    const startX = -totalWidth / 2;
+
+    level.forEach((id, posIdx) => {
+      arranged.set(id, {
+        x: startX + posIdx * (NODE_W + GAP_X),
+        y: levelIdx * (NODE_H + GAP_Y),
+      });
+    });
+  });
+
+  return nodes.map((n) => {
+    const pos = arranged.get(n.id);
+    return pos ? { ...n, position: pos } : n;
+  });
+}
+
 function ExplorerIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -97,6 +169,16 @@ function InspectorChevron({ open }: { open: boolean }) {
     <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
       style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.15s ease', flexShrink: 0 }}>
       <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+function SidePanelToggle({ open }: { open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transition: 'transform 0.2s ease', transform: open ? 'rotate(0)' : 'rotate(180deg)' }}>
+      <rect x="1" y="2" width="14" height="12" rx="2" />
+      <path d="M10 2v12" />
     </svg>
   );
 }
@@ -269,6 +351,12 @@ function Editor() {
     setStatus(isSupabaseConfigured ? 'Saved to Supabase' : 'Saved to browser storage');
   };
 
+  const handleAutoArrange = () => {
+    const arranged = autoArrange(nodes, edges);
+    setNodes(arranged);
+    setStatus('Auto-arranged nodes');
+  };
+
   const loadProject = (project: DiagramSnapshot) => {
     setProjectId(project.id ?? crypto.randomUUID());
     setProjectFolderId(project.folderId);
@@ -379,7 +467,7 @@ function Editor() {
                   <span className="panel-profile-badge">Authenticated</span>
                 </div>
                 <div className="panel-profile-theme">
-                  <span>Theme</span>
+                  <span>Dark Mode</span>
                   <button
                     className={`theme-toggle ${theme === 'dark' ? 'theme-toggle--dark' : ''}`}
                     onClick={toggleTheme}
@@ -411,6 +499,9 @@ function Editor() {
           </div>
           <div className="topbar-right">
             <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>
+            <button className="topbar-btn" onClick={handleAutoArrange} title="Auto arrange">
+              <LayoutGrid size={14} />
+            </button>
             <button className="topbar-btn" onClick={saveCurrentDiagram} title="Save">
               <Save size={14} />
             </button>
@@ -439,7 +530,7 @@ function Editor() {
       {/* Inspector */}
       <aside className={`inspector ${inspectorOpen ? '' : 'inspector--collapsed'}`}>
         <button className="inspector-toggle" onClick={() => setInspectorOpen(!inspectorOpen)} title={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'}>
-          <InspectorChevron open={inspectorOpen} />
+          <SidePanelToggle open={inspectorOpen} />
         </button>
         {inspectorOpen && (<>
         <section>

@@ -63,24 +63,37 @@ export const signOut = async () => {
 };
 
 export const loadUserTheme = async (): Promise<'light' | 'dark'> => {
-  if (!supabase) return 'light';
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 'light';
-  const { data } = await supabase
-    .from('user_profiles')
-    .select('theme')
-    .eq('id', user.id)
-    .single();
-  return (data?.theme === 'dark') ? 'dark' : 'light';
+  if (!supabase) {
+    return (localStorage.getItem('uml:theme') as 'light' | 'dark') || 'light';
+  }
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return 'light';
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('theme')
+      .eq('id', user.id)
+      .single();
+    if (error || !data) return 'light';
+    return (data.theme === 'dark') ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
 };
 
 export const saveUserTheme = async (theme: 'light' | 'dark') => {
+  localStorage.setItem('uml:theme', theme);
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase
-    .from('user_profiles')
-    .upsert({ id: user.id, theme }, { onConflict: 'id' });
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({ id: user.id, theme }, { onConflict: 'id' });
+    if (error) console.warn('Failed to save theme:', error.message);
+  } catch (e) {
+    console.warn('Failed to save theme:', e);
+  }
 };
 
 export const onAuthChange = (callback: (session: Session | null) => void) => {

@@ -81,7 +81,7 @@ label {
 /* ── Layout ─────────────────────────────────────── */
 .app-layout {
   display: grid;
-  grid-template-columns: 48px auto 1fr 320px;
+  grid-template-columns: 48px 240px 1fr minmax(36px, 320px);
   height: 100svh;
   min-width: 0;
 }
@@ -147,6 +147,8 @@ label {
   background: var(--panel);
   border-right: 1px solid var(--border);
   width: 240px;
+  min-width: 0;
+  max-width: 240px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -621,12 +623,14 @@ label {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
   padding: 12px;
 }
 .inspector--collapsed {
   padding: 4px;
   overflow: hidden;
+  width: 36px;
   min-width: 36px;
   max-width: 36px;
 }
