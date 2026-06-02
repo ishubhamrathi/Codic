@@ -41,6 +41,7 @@ export type UmlEdge = Edge<UmlEdgeData>;
 
 export type DiagramSnapshot = {
   id?: string;
+  folderId?: string;
   name: string;
   nodes: UmlNode[];
   edges: UmlEdge[];

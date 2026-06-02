@@ -1,30 +1,16 @@
--- Codic - Full Schema
--- Run individual migrations from supabase/migrations/ in order for production.
--- This file is a reference of the complete schema.
+-- 001: Initial schema - user_profiles and uml_projects
 
 create extension if not exists "pgcrypto";
 
--- User profiles table
 create table if not exists public.user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   created_at timestamptz not null default now()
 );
 
--- Folders table
-create table if not exists public.uml_folders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade not null,
-  name text not null,
-  parent_id uuid references public.uml_folders(id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
--- Projects table
 create table if not exists public.uml_projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  folder_id uuid references public.uml_folders(id) on delete set null,
   name text not null,
   nodes jsonb not null default '[]'::jsonb,
   edges jsonb not null default '[]'::jsonb,
@@ -32,9 +18,7 @@ create table if not exists public.uml_projects (
   created_at timestamptz not null default now()
 );
 
--- Enable RLS
 alter table public.user_profiles enable row level security;
-alter table public.uml_folders enable row level security;
 alter table public.uml_projects enable row level security;
 
 -- User profiles policies
@@ -49,23 +33,6 @@ create policy "Users insert own profile"
 create policy "Users update own profile"
   on public.user_profiles for update to authenticated
   using (auth.uid() = id) with check (auth.uid() = id);
-
--- Folders policies
-create policy "Users read own folders"
-  on public.uml_folders for select to authenticated
-  using (auth.uid() = user_id);
-
-create policy "Users insert own folders"
-  on public.uml_folders for insert to authenticated
-  with check (auth.uid() = user_id);
-
-create policy "Users update own folders"
-  on public.uml_folders for update to authenticated
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "Users delete own folders"
-  on public.uml_folders for delete to authenticated
-  using (auth.uid() = user_id);
 
 -- Projects policies
 create policy "Users read own projects"

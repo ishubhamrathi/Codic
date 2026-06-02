@@ -91,6 +91,7 @@ export const saveDiagram = async (diagram: DiagramSnapshot) => {
   const payload = {
     id: diagram.id,
     user_id: user.id,
+    folder_id: diagram.folderId ?? null,
     name: diagram.name,
     nodes: diagram.nodes,
     edges: diagram.edges,
@@ -102,6 +103,7 @@ export const saveDiagram = async (diagram: DiagramSnapshot) => {
 
   return {
     id: data.id as string,
+    folderId: (data.folder_id as string | null) ?? undefined,
     name: data.name as string,
     nodes: data.nodes as DiagramSnapshot['nodes'],
     edges: data.edges as DiagramSnapshot['edges'],
@@ -127,11 +129,89 @@ export const loadUserProjects = async (): Promise<DiagramSnapshot[]> => {
 
   return data.map((row) => ({
     id: row.id as string,
+    folderId: (row.folder_id as string | null) ?? undefined,
     name: row.name as string,
     nodes: row.nodes as DiagramSnapshot['nodes'],
     edges: row.edges as DiagramSnapshot['edges'],
     updatedAt: row.updated_at as string,
   }));
+};
+
+export type FolderData = {
+  id: string;
+  name: string;
+  parentId?: string;
+  createdAt: string;
+};
+
+export const loadFolders = async (): Promise<FolderData[]> => {
+  if (!supabase) return [];
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('uml_folders')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+
+  return data.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    parentId: (row.parent_id as string | null) ?? undefined,
+    createdAt: row.created_at as string,
+  }));
+};
+
+export const createFolder = async (name: string, parentId?: string): Promise<FolderData> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('uml_folders')
+    .insert({ user_id: user.id, name, parent_id: parentId ?? null })
+    .select()
+    .single();
+  if (error) throw error;
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    parentId: (data.parent_id as string | null) ?? undefined,
+    createdAt: data.created_at as string,
+  };
+};
+
+export const renameFolder = async (id: string, name: string): Promise<void> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('uml_folders').update({ name }).eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteFolder = async (id: string): Promise<void> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('uml_folders').delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteProject = async (id: string): Promise<void> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('uml_projects').delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const renameProject = async (id: string, name: string): Promise<void> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('uml_projects').update({ name }).eq('id', id);
+  if (error) throw error;
+};
+
+export const moveProject = async (id: string, folderId: string | null): Promise<void> => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.from('uml_projects').update({ folder_id: folderId }).eq('id', id);
+  if (error) throw error;
 };
 
 export const loadLocalDiagram = (): DiagramSnapshot | null => {

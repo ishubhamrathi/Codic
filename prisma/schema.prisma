@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  projects UmlProject[]
+  folders  UmlFolder[]
+
+  @@map("user_profiles")
+}
+
+model UmlFolder {
+  id       String       @id @default(uuid()) @db.Uuid
+  userId   String       @map("user_id") @db.Uuid
+  name     String
+  parentId String?      @map("parent_id") @db.Uuid
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user     UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   UmlFolder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children UmlFolder[]  @relation("FolderTree")
+  projects UmlProject[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@map("uml_folders")
+}
+
+model UmlProject {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  folderId  String?   @map("folder_id") @db.Uuid
+  name      String
+  nodes     Json      @default("[]")
+  edges     Json      @default("[]")
+  updatedAt DateTime  @default(now()) @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user   UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder UmlFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([folderId])
+  @@map("uml_projects")
+}

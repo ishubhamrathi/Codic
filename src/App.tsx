@@ -14,15 +14,16 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Code2, Database, Download, LogOut, MousePointer2, Save, Shapes, Sparkles } from 'lucide-react';
+import { Code2, Download, MousePointer2, Save, Shapes, Sparkles } from 'lucide-react';
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, loadUserProjects, saveDiagram } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
 import { AuthPage } from './component/Auth';
+import { ProjectExplorer } from './component/ProjectExplorer';
 import type { DiagramSnapshot, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
 
 const initialNodes: UmlNode[] = [
@@ -71,9 +72,36 @@ const relationOptions: UmlRelationKind[] = [
   'dependency',
 ];
 
+function ExplorerIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h4l2 2h6" />
+      <rect x="2" y="4" width="12" height="9" rx="1.5" />
+    </svg>
+  );
+}
+
+function ProfileIcon({ initials }: { initials: string }) {
+  return (
+    <div className="activity-avatar">
+      {initials}
+    </div>
+  );
+}
+
+function InspectorChevron({ open }: { open: boolean }) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.15s ease', flexShrink: 0 }}>
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
 function Editor() {
   const { user, signOut } = useAuth();
-  const [projectId, setProjectId] = useState<string>();
+  const [projectId, setProjectId] = useState<string>(crypto.randomUUID());
+  const [projectFolderId, setProjectFolderId] = useState<string | undefined>(undefined);
   const [projectName, setProjectName] = useState('Untitled UML Project');
   const [nodes, setNodes, onNodesChange] = useNodesState<UmlNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<UmlEdge>(initialEdges);
@@ -81,10 +109,51 @@ function Editor() {
   const [selectedRelation, setSelectedRelation] = useState<UmlRelationKind>('association');
   const [textInput, setTextInput] = useState('class Order {\n- id: Long\n- total: BigDecimal\n+ calculateTotal(): BigDecimal\n}');
   const [status, setStatus] = useState('Local draft ready');
+  const [recentProjectId, setRecentProjectId] = useState<string | undefined>();
+  const [activePanel, setActivePanel] = useState<'explorer' | 'profile' | null>('explorer');
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState<Record<string, boolean>>({
+    inspector: false,
+    textToVisual: false,
+    code: true,
+    nodes: false,
+    relations: false,
+  });
   const { screenToFlowPosition } = useReactFlow();
+
+  const toggleInspectorSection = (key: string) => {
+    setInspectorCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const startRelation = () => {
+    if (!selectedNodeId) return;
+    const targetId = prompt('Target node ID:');
+    if (!targetId || targetId === selectedNodeId) return;
+    const targetNode = nodes.find((n) => n.id === targetId);
+    if (!targetNode) return;
+    setEdges((current) =>
+      addEdge(
+        {
+          id: `e-${selectedNodeId}-${targetId}`,
+          source: selectedNodeId,
+          target: targetId,
+          type: 'smoothstep' as const,
+          label: selectedRelation,
+          data: { relation: selectedRelation, label: selectedRelation },
+        },
+        current,
+      ),
+    );
+    setStatus(`Relation: ${selectedRelation} added`);
+  };
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const generatedCode = useMemo(() => generateJavaCode(nodes, edges), [nodes, edges]);
+
+  const userDisplayName = user?.user_metadata?.display_name
+    || user?.email?.split('@')[0]
+    || 'User';
+  const userInitials = userDisplayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -92,7 +161,7 @@ function Editor() {
         addEdge(
           {
             ...connection,
-            type: 'smoothstep',
+            type: 'smoothstep' as const,
             label: selectedRelation,
             data: { relation: selectedRelation, label: selectedRelation },
           },
@@ -127,32 +196,37 @@ function Editor() {
   const saveCurrentDiagram = async () => {
     const saved = await saveDiagram({
       id: projectId,
+      folderId: projectFolderId,
       name: projectName,
       nodes,
       edges,
       updatedAt: new Date().toISOString(),
     });
     setProjectId(saved.id);
+    setRecentProjectId(saved.id);
     setStatus(isSupabaseConfigured ? 'Saved to Supabase' : 'Saved to browser storage');
   };
 
-  const loadSavedDiagram = async () => {
-    try {
-      const projects = await loadUserProjects();
-      if (!projects.length) {
-        setStatus('No saved projects found');
-        return;
-      }
-      const local = projects[0];
-      setProjectId(local.id);
-      setProjectName(local.name);
-      setNodes(local.nodes);
-      setEdges(local.edges);
-      setSelectedNodeId(local.nodes[0]?.id);
-      setStatus('Loaded project');
-    } catch {
-      setStatus('Failed to load projects');
-    }
+  const loadProject = (project: DiagramSnapshot) => {
+    setProjectId(project.id ?? crypto.randomUUID());
+    setProjectFolderId(project.folderId);
+    setProjectName(project.name);
+    setNodes(project.nodes);
+    setEdges(project.edges);
+    setSelectedNodeId(project.nodes[0]?.id);
+    setRecentProjectId(project.id);
+    setStatus('Loaded project');
+  };
+
+  const handleCreateProject = (folderId?: string) => {
+    const name = prompt('Project name:');
+    if (!name) return;
+    setProjectId(crypto.randomUUID());
+    setProjectFolderId(folderId);
+    setProjectName(name);
+    setNodes([]);
+    setEdges([]);
+    setStatus('New project created');
   };
 
   const importText = () => {
@@ -166,6 +240,7 @@ function Editor() {
   const exportJson = () => {
     const snapshot: DiagramSnapshot = {
       id: projectId,
+      folderId: projectFolderId,
       name: projectName,
       nodes,
       edges,
@@ -184,69 +259,89 @@ function Editor() {
   };
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <Shapes size={22} />
-          <div>
-            <h1>UML Studio</h1>
-            <p>Visual design to Java class code.</p>
-          </div>
+    <main className="app-layout">
+      {/* Activity Bar - leftmost narrow strip */}
+      <div className="activity-bar">
+        <div className="activity-bar-top">
+          <button
+            className={`activity-btn ${activePanel === 'explorer' ? 'active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'explorer' ? null : 'explorer')}
+            title="Explorer"
+          >
+            <ExplorerIcon />
+          </button>
         </div>
+        <div className="activity-bar-bottom">
+          <button
+            className={`activity-btn ${activePanel === 'profile' ? 'active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'profile' ? null : 'profile')}
+            title={userDisplayName}
+          >
+            <ProfileIcon initials={userInitials} />
+          </button>
+        </div>
+      </div>
 
-        {user && (
-          <section>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label>{user.email}</label>
-              <button onClick={signOut} style={{ padding: '4px 8px', minHeight: 'auto' }}>
-                <LogOut size={14} />
-              </button>
+      {/* Side Panel */}
+      {activePanel && (
+        <div className="side-panel">
+          {activePanel === 'explorer' && (
+            <ProjectExplorer
+              onLoadProject={loadProject}
+              onCreateProject={handleCreateProject}
+              currentProjectId={projectId}
+              recentProjectId={recentProjectId}
+            />
+          )}
+          {activePanel === 'profile' && (
+            <div className="panel-profile">
+              <div className="panel-profile-header">
+                <span>Account</span>
+              </div>
+              <div className="panel-profile-body">
+                <div className="panel-profile-avatar">{userInitials}</div>
+                <div className="panel-profile-name">{userDisplayName}</div>
+                <div className="panel-profile-email">{user?.email ?? 'No email'}</div>
+                <div className="panel-profile-meta">
+                  <span className="panel-profile-badge">Authenticated</span>
+                </div>
+                <button className="panel-profile-signout" onClick={signOut}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
             </div>
-          </section>
-        )}
+          )}
+        </div>
+      )}
 
-        <section>
-          <label>Project</label>
-          <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-          <div className="button-row">
-            <button onClick={saveCurrentDiagram}>
-              <Save size={16} /> Save
-            </button>
-            <button onClick={loadSavedDiagram}>
-              <Database size={16} /> Load
-            </button>
-          </div>
-          <p className="status">{status}</p>
-        </section>
-
-        <section>
-          <label>Drop UML Nodes</label>
-          {(['class', 'abstract', 'interface', 'enum'] as UmlNodeKind[]).map((kind) => (
-            <button className="palette-item" draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
-              <MousePointer2 size={16} />
-              {kind}
-            </button>
-          ))}
-        </section>
-
-        <section>
-          <label>New Relation</label>
-          <select value={selectedRelation} onChange={(event) => setSelectedRelation(event.target.value as UmlRelationKind)}>
-            {relationOptions.map((relation) => (
-              <option key={relation} value={relation}>
-                {relation}
-              </option>
-            ))}
-          </select>
-        </section>
-      </aside>
-
+      {/* Workspace */}
       <section className="workspace">
         <div className="topbar">
-          <strong>Whiteboard</strong>
-          <span>{nodes.length} nodes · {edges.length} relations</span>
+          <div className="topbar-left">
+            <div className="brand-mini">
+              <Shapes size={16} />
+              <span>Codic</span>
+            </div>
+          </div>
+          <div className="topbar-center">
+            <input
+              className="project-name-input"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+            />
+          </div>
+          <div className="topbar-right">
+            <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>
+            <button className="topbar-btn" onClick={saveCurrentDiagram} title="Save">
+              <Save size={14} />
+            </button>
+            <span className="topbar-dot">{status}</span>
+          </div>
         </div>
-        <div className="canvas" onDrop={onDrop} onDragOver={(event) => event.preventDefault()}>
+        <div className="canvas" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -264,85 +359,144 @@ function Editor() {
         </div>
       </section>
 
-      <aside className="inspector">
+      {/* Inspector */}
+      <aside className={`inspector ${inspectorOpen ? '' : 'inspector--collapsed'}`}>
+        <button className="inspector-toggle" onClick={() => setInspectorOpen(!inspectorOpen)} title={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'}>
+          <InspectorChevron open={inspectorOpen} />
+        </button>
+        {inspectorOpen && (<>
         <section>
-          <label>Inspector</label>
-          {selectedNode ? (
-            <>
-              <input value={selectedNode.data.name} onChange={(event) => updateSelectedNode({ name: event.target.value })} />
-              <select
-                value={selectedNode.data.kind}
-                onChange={(event) => updateSelectedNode({ kind: event.target.value as UmlNodeKind })}
-              >
-                <option value="class">Class</option>
-                <option value="abstract">Abstract Class</option>
-                <option value="interface">Interface</option>
-                <option value="enum">Enum</option>
-              </select>
-              <textarea
-                value={
-                  selectedNode.data.kind === 'enum'
-                    ? selectedNode.data.enumValues?.join('\n')
-                    : selectedNode.data.fields.map((field) => `${field.name}: ${field.type}`).join('\n')
-                }
-                onChange={(event) =>
-                  selectedNode.data.kind === 'enum'
-                    ? updateSelectedNode({ enumValues: event.target.value.split('\n').filter(Boolean) })
-                    : updateSelectedNode({
-                        fields: event.target.value
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('inspector')}>
+            <InspectorChevron open={!inspectorCollapsed.inspector} /> Inspector
+          </label>
+          {!inspectorCollapsed.inspector && (
+            selectedNode ? (
+              <>
+                <input value={selectedNode.data.name} onChange={(event) => updateSelectedNode({ name: event.target.value })} />
+                <select
+                  value={selectedNode.data.kind}
+                  onChange={(event) => updateSelectedNode({ kind: event.target.value as UmlNodeKind })}
+                >
+                  <option value="class">Class</option>
+                  <option value="abstract">Abstract Class</option>
+                  <option value="interface">Interface</option>
+                  <option value="enum">Enum</option>
+                </select>
+                <textarea
+                  value={
+                    selectedNode.data.kind === 'enum'
+                      ? selectedNode.data.enumValues?.join('\n')
+                      : selectedNode.data.fields.map((field) => `${field.name}: ${field.type}`).join('\n')
+                  }
+                  onChange={(event) =>
+                    selectedNode.data.kind === 'enum'
+                      ? updateSelectedNode({ enumValues: event.target.value.split('\n').filter(Boolean) })
+                      : updateSelectedNode({
+                          fields: event.target.value
+                            .split('\n')
+                            .filter(Boolean)
+                            .map((line) => {
+                              const [name, type] = line.split(':');
+                              return createMember(name.trim(), type?.trim() || 'String');
+                            }),
+                        })
+                  }
+                  rows={5}
+                  placeholder="fieldName: Type"
+                />
+                {selectedNode.data.kind !== 'enum' && (
+                  <textarea
+                    value={selectedNode.data.methods.map((method) => `${method.name}: ${method.type}`).join('\n')}
+                    onChange={(event) =>
+                      updateSelectedNode({
+                        methods: event.target.value
                           .split('\n')
                           .filter(Boolean)
                           .map((line) => {
                             const [name, type] = line.split(':');
-                            return createMember(name.trim(), type?.trim() || 'String');
+                            return createMember(name.trim(), type?.trim() || 'void', 'public');
                           }),
                       })
-                }
-                rows={5}
-                placeholder="fieldName: Type"
-              />
-              {selectedNode.data.kind !== 'enum' && (
-                <textarea
-                  value={selectedNode.data.methods.map((method) => `${method.name}: ${method.type}`).join('\n')}
-                  onChange={(event) =>
-                    updateSelectedNode({
-                      methods: event.target.value
-                        .split('\n')
-                        .filter(Boolean)
-                        .map((line) => {
-                          const [name, type] = line.split(':');
-                          return createMember(name.trim(), type?.trim() || 'void', 'public');
-                        }),
-                    })
-                  }
-                  rows={5}
-                  placeholder="methodName: ReturnType"
-                />
-              )}
-            </>
-          ) : (
-            <p>Select a node to edit it.</p>
+                    }
+                    rows={5}
+                    placeholder="methodName: ReturnType"
+                  />
+                )}
+              </>
+            ) : (
+              <p>Select a node to edit it.</p>
+            )
           )}
         </section>
 
         <section>
-          <label>
-            <Sparkles size={15} /> Text or Code to Visual
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('textToVisual')}>
+            <InspectorChevron open={!inspectorCollapsed.textToVisual} />
+            <Sparkles size={14} /> Text to Visual
           </label>
-          <textarea value={textInput} onChange={(event) => setTextInput(event.target.value)} rows={8} />
-          <button onClick={importText}>Generate visual nodes</button>
+          {!inspectorCollapsed.textToVisual && (
+            <>
+              <textarea value={textInput} onChange={(event) => setTextInput(event.target.value)} rows={6} />
+              <button onClick={importText}>Generate nodes</button>
+            </>
+          )}
         </section>
 
         <section className="code-panel">
-          <label>
-            <Code2 size={15} /> Java Code
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('code')}>
+            <InspectorChevron open={!inspectorCollapsed.code} />
+            <Code2 size={14} /> Java Code
           </label>
-          <pre>{generatedCode}</pre>
-          <button onClick={() => navigator.clipboard.writeText(generatedCode)}>
-            <Download size={16} /> Copy Java
-          </button>
-          <button onClick={exportJson}>Copy Project JSON</button>
+          {!inspectorCollapsed.code && (
+            <>
+              <pre>{generatedCode}</pre>
+              <button onClick={() => navigator.clipboard.writeText(generatedCode)}>
+                <Download size={14} /> Copy
+              </button>
+              <button onClick={exportJson}>Export JSON</button>
+            </>
+          )}
         </section>
+
+        <section>
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('nodes')}>
+            <InspectorChevron open={!inspectorCollapsed.nodes} /> Nodes
+          </label>
+          {!inspectorCollapsed.nodes && (
+            <>
+              {(['class', 'abstract', 'interface', 'enum'] as UmlNodeKind[]).map((kind) => (
+                <button className="palette-item" draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
+                  <MousePointer2 size={14} />
+                  {kind}
+                </button>
+              ))}
+            </>
+          )}
+        </section>
+
+        <section>
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('relations')}>
+            <InspectorChevron open={!inspectorCollapsed.relations} /> Relation
+          </label>
+          {!inspectorCollapsed.relations && (
+            <>
+              {relationOptions.map((rel) => (
+                <button
+                  key={rel}
+                  className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
+                  onClick={() => setSelectedRelation(rel)}
+                >
+                  <MousePointer2 size={14} />
+                  {rel}
+                </button>
+              ))}
+              {selectedRelation && selectedNodeId && (
+                <button onClick={startRelation}>Link selected to…</button>
+              )}
+            </>
+          )}
+        </section>
+        </>)}
       </aside>
     </main>
   );
@@ -361,14 +515,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100svh',
-        background: 'var(--bg)',
-      }}>
-        <p style={{ color: 'var(--muted)' }}>Loading...</p>
+      <div className="loading-screen">
+        <p>Loading...</p>
       </div>
     );
   }

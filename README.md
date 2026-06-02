@@ -1,4 +1,4 @@
-# UML Studio
+# Draw Studio
 
 Fullstack-ready UML whiteboard for designing Java classes and generating starter code.
 
