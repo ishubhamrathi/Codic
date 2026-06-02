@@ -18,7 +18,7 @@ import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid } fr
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadUserTheme, saveUserTheme } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadFolders, loadUserTheme, saveUserTheme, type FolderData } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
@@ -75,6 +75,30 @@ const relationOptions: UmlRelationKind[] = [
   'dependency',
 ];
 
+function nodeHeight(d: UmlNodeData): number {
+  const header = 52;
+  const rowH = 24;
+  const sectionPad = 20;
+  if (d.kind === 'enum') {
+    const count = d.enumValues?.length ?? 0;
+    return header + sectionPad + Math.max(count, 1) * rowH + 14;
+  }
+  const fieldRows = Math.max(d.fields.length, 1);
+  const methodRows = Math.max(d.methods.length, 1);
+  return header + sectionPad + fieldRows * rowH + sectionPad + methodRows * rowH + 14;
+}
+
+function nodeWidth(d: UmlNodeData): number {
+  let maxLen = d.name.length;
+  if (d.kind === 'enum') {
+    for (const v of d.enumValues ?? []) maxLen = Math.max(maxLen, v.length);
+  } else {
+    for (const f of d.fields) maxLen = Math.max(maxLen, `${f.name}: ${f.type}`.length);
+    for (const m of d.methods) maxLen = Math.max(maxLen, `${m.name}(): ${m.type}`.length);
+  }
+  return Math.max(160, Math.min(360, maxLen * 7.5 + 48));
+}
+
 function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
   if (nodes.length === 0) return nodes;
 
@@ -122,23 +146,38 @@ function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
     bfs(unvisited.map((n) => n.id));
   }
 
-  const NODE_W = 200;
-  const NODE_H = 160;
   const GAP_X = 60;
-  const GAP_Y = 100;
+  const GAP_Y = 80;
 
   const arranged = new Map<string, { x: number; y: number }>();
 
-  levels.forEach((level, levelIdx) => {
-    const totalWidth = level.length * NODE_W + (level.length - 1) * GAP_X;
-    const startX = -totalWidth / 2;
+  let currentY = 0;
+
+  levels.forEach((level) => {
+    let levelMaxH = 0;
+    let totalW = 0;
+
+    const widths = level.map((id) => {
+      const d = nodeMap.get(id)!.data;
+      const w = nodeWidth(d);
+      totalW += w;
+      return w;
+    });
+
+    totalW += (level.length - 1) * GAP_X;
+    let x = -totalW / 2;
 
     level.forEach((id, posIdx) => {
-      arranged.set(id, {
-        x: startX + posIdx * (NODE_W + GAP_X),
-        y: levelIdx * (NODE_H + GAP_Y),
-      });
+      const d = nodeMap.get(id)!.data;
+      const w = widths[posIdx];
+      const h = nodeHeight(d);
+      if (h > levelMaxH) levelMaxH = h;
+
+      arranged.set(id, { x, y: currentY });
+      x += w + GAP_X;
     });
+
+    currentY += levelMaxH + GAP_Y;
   });
 
   return nodes.map((n) => {
@@ -185,6 +224,7 @@ function SidePanelToggle({ open }: { open: boolean }) {
 
 function Editor() {
   const { user, signOut } = useAuth();
+  const [dataLoading, setDataLoading] = useState(true);
   const [projectId, setProjectId] = useState<string>(crypto.randomUUID());
   const [projectFolderId, setProjectFolderId] = useState<string | undefined>(undefined);
   const [projectName, setProjectName] = useState('Untitled UML Project');
@@ -198,7 +238,15 @@ function Editor() {
   const [activePanel, setActivePanel] = useState<'explorer' | 'profile' | null>('explorer');
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [allProjects, setAllProjects] = useState<DiagramSnapshot[]>([]);
+  const [allFolders, setAllFolders] = useState<FolderData[]>([]);
+  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('uml:theme') as 'light' | 'dark' | null;
+    const initial = saved || 'light';
+    document.documentElement.setAttribute('data-theme', initial);
+    return initial;
+  });
   const [inspectorCollapsed, setInspectorCollapsed] = useState<Record<string, boolean>>({
     inspector: false,
     textToVisual: false,
@@ -243,29 +291,35 @@ function Editor() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!isSupabaseConfigured) return;
-      const projects = await loadUserProjects();
-      if (cancelled) return;
-      if (projects.length > 0) {
-        const latest = projects[0];
-        setProjectId(latest.id ?? crypto.randomUUID());
-        setProjectFolderId(latest.folderId);
-        setProjectName(latest.name);
-        setNodes(latest.nodes);
-        setEdges(latest.edges);
-        setSelectedNodeId(latest.nodes[0]?.id);
-        setRecentProjectId(latest.id);
-      } else {
-        const saved = await saveDiagram({
-          id: crypto.randomUUID(),
-          name: projectName,
-          nodes,
-          edges,
-          updatedAt: new Date().toISOString(),
-        });
-        setProjectId(saved.id);
-        setRecentProjectId(saved.id);
-        setExplorerRefreshKey((k) => k + 1);
+      try {
+        if (!isSupabaseConfigured) return;
+        const [projects, folders] = await Promise.all([loadUserProjects(), loadFolders()]);
+        if (cancelled) return;
+        setAllProjects(projects);
+        setAllFolders(folders);
+        if (projects.length > 0) {
+          const latest = projects[0];
+          setProjectId(latest.id ?? crypto.randomUUID());
+          setProjectFolderId(latest.folderId);
+          setProjectName(latest.name);
+          setNodes(latest.nodes);
+          setEdges(latest.edges);
+          setSelectedNodeId(latest.nodes[0]?.id);
+          setRecentProjectId(latest.id);
+        } else {
+          const saved = await saveDiagram({
+            id: crypto.randomUUID(),
+            name: projectName,
+            nodes,
+            edges,
+            updatedAt: new Date().toISOString(),
+          });
+          setProjectId(saved.id);
+          setRecentProjectId(saved.id);
+          setExplorerRefreshKey((k) => k + 1);
+        }
+      } finally {
+        if (!cancelled) setDataLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -278,10 +332,38 @@ function Editor() {
       if (!cancelled) {
         setTheme(saved);
         document.documentElement.setAttribute('data-theme', saved);
+        localStorage.setItem('uml:theme', saved);
       }
+      if (!cancelled) setThemeLoaded(true);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipSave = useRef(true);
+
+  useEffect(() => {
+    if (skipSave.current) { skipSave.current = false; return; }
+    if (!isSupabaseConfigured) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        await saveDiagram({
+          id: projectId,
+          folderId: projectFolderId,
+          name: projectName,
+          nodes,
+          edges,
+          updatedAt: new Date().toISOString(),
+        });
+        setStatus('Auto-saved');
+      } catch (e) {
+        console.warn('Auto-save failed:', e);
+        setStatus('Auto-save failed');
+      }
+    }, 1500);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [nodes, edges, projectName]);
 
   const toggleTheme = async () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -348,7 +430,7 @@ function Editor() {
     setProjectId(saved.id);
     setRecentProjectId(saved.id);
     setExplorerRefreshKey((k) => k + 1);
-    setStatus(isSupabaseConfigured ? 'Saved to Supabase' : 'Saved to browser storage');
+    setStatus(isSupabaseConfigured ? 'Saved to Cloud' : 'Saved to browser storage');
   };
 
   const handleAutoArrange = () => {
@@ -418,8 +500,17 @@ function Editor() {
     onEdgesChange(changes);
   };
 
+  if (dataLoading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <p>Loading diagram...</p>
+      </div>
+    );
+  }
+
   return (
-    <main className="app-layout">
+    <main className={`app-layout ${!activePanel ? 'no-side-panel' : ''} ${!inspectorOpen ? 'inspector-collapsed' : ''}`}>
       {/* Activity Bar - leftmost narrow strip */}
       <div className="activity-bar">
         <div className="activity-bar-top">
@@ -443,18 +534,17 @@ function Editor() {
       </div>
 
       {/* Side Panel */}
-      {activePanel && (
-        <div className="side-panel">
-          {activePanel === 'explorer' && (
-            <ProjectExplorer
-              onLoadProject={loadProject}
-              onCreateProject={handleCreateProject}
-              currentProjectId={projectId}
-              recentProjectId={recentProjectId}
-              refreshKey={explorerRefreshKey}
-            />
-          )}
-          {activePanel === 'profile' && (
+      <div className={`side-panel ${!activePanel ? 'side-panel--hidden' : ''}`}>
+        {activePanel === 'explorer' && (
+          <ProjectExplorer
+            onLoadProject={loadProject}
+            onCreateProject={handleCreateProject}
+            currentProjectId={projectId}
+            recentProjectId={recentProjectId}
+            refreshKey={explorerRefreshKey}
+          />
+        )}
+        {activePanel === 'profile' && (
             <div className="panel-profile">
               <div className="panel-profile-header">
                 <span>Account</span>
@@ -485,8 +575,7 @@ function Editor() {
               </div>
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {/* Workspace */}
       <section className="workspace">

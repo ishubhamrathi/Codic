@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { visibilitySymbol, createMember } from '../lib/umlFactory';
-import type { UmlNode, UmlVisibility } from '../types/uml';
+import type { UmlNode, UmlVisibility, UmlNodeData } from '../types/uml';
 
 const stereotype = {
   class: 'class',
@@ -31,11 +31,18 @@ function InlineEdit({
 }) {
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
+  const committed = useRef(false);
 
   useEffect(() => {
     ref.current?.focus();
     ref.current?.select();
   }, []);
+
+  const commit = useCallback(() => {
+    if (committed.current) return;
+    committed.current = true;
+    onCommit(draft);
+  }, [draft, onCommit]);
 
   return (
     <input
@@ -44,16 +51,27 @@ function InlineEdit({
       value={draft}
       placeholder={placeholder}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(draft)}
+      onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          onCommit(draft);
+          commit();
           if (onEnter) onEnter();
         }
-        if (e.key === 'Escape') onCommit(value);
-        if (e.key === 'ArrowUp' && onArrowUp) { e.preventDefault(); onCommit(draft); onArrowUp(); }
-        if (e.key === 'ArrowDown' && onArrowDown) { e.preventDefault(); onCommit(draft); onArrowDown(); }
+        if (e.key === 'Escape') {
+          committed.current = true;
+          onCommit(value);
+        }
+        if (e.key === 'ArrowUp' && onArrowUp) {
+          e.preventDefault();
+          commit();
+          onArrowUp();
+        }
+        if (e.key === 'ArrowDown' && onArrowDown) {
+          e.preventDefault();
+          commit();
+          onArrowDown();
+        }
       }}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
@@ -64,9 +82,13 @@ function InlineEdit({
 function AddRow({
   placeholder,
   onCommit,
+  onClose,
+  onArrowDown,
 }: {
   placeholder: string;
   onCommit: (v: string) => void;
+  onClose?: () => void;
+  onArrowDown?: () => void;
 }) {
   const [draft, setDraft] = useState('');
   const ref = useRef<HTMLInputElement>(null);
@@ -87,7 +109,9 @@ function AddRow({
         onBlur={() => { if (draft.trim()) onCommit(draft); else onCommit(''); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); onCommit(draft); }
-          if (e.key === 'Escape') onCommit('');
+          if (e.key === 'Escape') { onCommit(''); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); onCommit(''); if (onClose) onClose(); }
+          if (e.key === 'ArrowDown' && onArrowDown) { e.preventDefault(); onCommit(''); onArrowDown(); }
         }}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
@@ -127,10 +151,6 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
     setEditing(null);
   };
 
-  const fieldCount = data.fields.length;
-  const methodCount = data.methods.length;
-  const enumCount = (data.enumValues ?? []).length;
-
   const commitField = (idx: number, v: string) => {
     const [name, type] = v.split(':');
     const fields = [...data.fields];
@@ -149,11 +169,41 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
     setEditing(null);
   };
 
-  const commitEnum = (idx: number, v: string) => {
-    const enumValues = [...(data.enumValues ?? [])];
-    enumValues[idx] = (v || value).toUpperCase();
-    update({ enumValues });
-    setEditing(null);
+  const fieldCount = data.fields.length;
+  const methodCount = data.methods.length;
+
+  const navDown = (current: string | null) => {
+    if (current === 'name') {
+      if (fieldCount > 0) setEditing('field-0');
+      else if (methodCount > 0) setEditing('method-0');
+      return;
+    }
+    if (current?.startsWith('field-')) {
+      const idx = parseInt(current.split('-')[1]);
+      if (idx < fieldCount - 1) setEditing(`field-${idx + 1}`);
+      else setAdding('fields');
+      return;
+    }
+    if (current?.startsWith('method-')) {
+      const idx = parseInt(current.split('-')[1]);
+      if (idx < methodCount - 1) setEditing(`method-${idx + 1}`);
+      else setAdding('methods');
+    }
+  };
+
+  const navUp = (current: string | null) => {
+    if (current?.startsWith('method-')) {
+      const idx = parseInt(current.split('-')[1]);
+      if (idx > 0) setEditing(`method-${idx - 1}`);
+      else if (fieldCount > 0) setEditing(`field-${fieldCount - 1}`);
+      else setEditing('name');
+      return;
+    }
+    if (current?.startsWith('field-')) {
+      const idx = parseInt(current.split('-')[1]);
+      if (idx > 0) setEditing(`field-${idx - 1}`);
+      else setEditing('name');
+    }
   };
 
   return (
@@ -161,7 +211,7 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
       className={`uml-node ${selected ? 'selected' : ''}`}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        if (!editing) setEditing('name');
+        if (!editing && !adding) setEditing('name');
       }}
     >
       <Handle type="target" position={Position.Top} />
@@ -171,10 +221,22 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
           <InlineEdit
             className="uml-inline-name"
             value={data.name}
+            onArrowDown={() => navDown('name')}
+            onEnter={() => navDown('name')}
             onCommit={(v) => { update({ name: v || data.name }); setEditing(null); }}
           />
         ) : (
-          <strong>{data.name}</strong>
+          <strong
+            className="uml-node__editable"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); setEditing('name'); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); setEditing('name'); }
+              if (e.key === 'ArrowDown') { e.preventDefault(); navDown('name'); }
+            }}
+          >
+            {data.name}
+          </strong>
         )}
       </div>
 
@@ -186,10 +248,10 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
                 <InlineEdit
                   value={value}
                   onArrowUp={idx > 0 ? () => setEditing(`enum-${idx - 1}`) : undefined}
-                  onArrowDown={idx < enumCount - 1
+                  onArrowDown={idx < (data.enumValues?.length ?? 0) - 1
                     ? () => setEditing(`enum-${idx + 1}`)
                     : () => setAdding('enum')}
-                  onEnter={idx < enumCount - 1
+                  onEnter={idx < (data.enumValues?.length ?? 0) - 1
                     ? () => setEditing(`enum-${idx + 1}`)
                     : () => setAdding('enum')}
                   onCommit={(v) => {
@@ -202,7 +264,17 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
               ) : (
                 <span
                   className="uml-node__editable"
+                  tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); setEditing(`enum-${idx}`); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); setEditing(`enum-${idx}`); }
+                    if (e.key === 'ArrowUp' && idx > 0) { e.preventDefault(); setEditing(`enum-${idx - 1}`); }
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (idx < (data.enumValues?.length ?? 0) - 1) setEditing(`enum-${idx + 1}`);
+                      else setAdding('enum');
+                    }
+                  }}
                 >
                   {value}
                 </span>
@@ -215,6 +287,10 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
           {adding === 'enum' ? (
             <AddRow
               placeholder="New value"
+              onClose={() => {
+                const ev = data.enumValues ?? [];
+                if (ev.length > 0) setEditing(`enum-${ev.length - 1}`);
+              }}
               onCommit={(v) => {
                 if (v.trim()) {
                   const enumValues = [...(data.enumValues ?? []), v.trim().toUpperCase()];
@@ -249,19 +325,21 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
                 {editing === `field-${idx}` ? (
                   <InlineEdit
                     value={`${field.name}: ${field.type}`}
-                    onArrowUp={idx > 0 ? () => setEditing(`field-${idx - 1}`) : undefined}
-                    onArrowDown={idx < fieldCount - 1
-                      ? () => setEditing(`field-${idx + 1}`)
-                      : () => setAdding('fields')}
-                    onEnter={idx < fieldCount - 1
-                      ? () => setEditing(`field-${idx + 1}`)
-                      : () => setAdding('fields')}
+                    onArrowUp={() => navUp(`field-${idx}`)}
+                    onArrowDown={() => navDown(`field-${idx}`)}
+                    onEnter={() => navDown(`field-${idx}`)}
                     onCommit={(v) => commitField(idx, v)}
                   />
                 ) : (
                   <span
                     className="uml-node__editable"
+                    tabIndex={0}
                     onClick={(e) => { e.stopPropagation(); setEditing(`field-${idx}`); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); setEditing(`field-${idx}`); }
+                      if (e.key === 'ArrowUp') { e.preventDefault(); navUp(`field-${idx}`); }
+                      if (e.key === 'ArrowDown') { e.preventDefault(); navDown(`field-${idx}`); }
+                    }}
                   >
                     {field.name}: {field.type}
                   </span>
@@ -274,6 +352,8 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
             {adding === 'fields' ? (
               <AddRow
                 placeholder="name: Type"
+                onClose={() => { if (fieldCount > 0) setEditing(`field-${fieldCount - 1}`); else setEditing('name'); }}
+                onArrowDown={() => { setAdding(null); if (methodCount > 0) setEditing('method-0'); }}
                 onCommit={(v) => {
                   if (v.trim()) {
                     const [name, type] = v.split(':');
@@ -306,19 +386,21 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
                 {editing === `method-${idx}` ? (
                   <InlineEdit
                     value={`${method.name}(): ${method.type}`}
-                    onArrowUp={idx > 0 ? () => setEditing(`method-${idx - 1}`) : undefined}
-                    onArrowDown={idx < methodCount - 1
-                      ? () => setEditing(`method-${idx + 1}`)
-                      : () => setAdding('methods')}
-                    onEnter={idx < methodCount - 1
-                      ? () => setEditing(`method-${idx + 1}`)
-                      : () => setAdding('methods')}
+                    onArrowUp={() => navUp(`method-${idx}`)}
+                    onArrowDown={() => navDown(`method-${idx}`)}
+                    onEnter={() => navDown(`method-${idx}`)}
                     onCommit={(v) => commitMethod(idx, v)}
                   />
                 ) : (
                   <span
                     className="uml-node__editable"
+                    tabIndex={0}
                     onClick={(e) => { e.stopPropagation(); setEditing(`method-${idx}`); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); setEditing(`method-${idx}`); }
+                      if (e.key === 'ArrowUp') { e.preventDefault(); navUp(`method-${idx}`); }
+                      if (e.key === 'ArrowDown') { e.preventDefault(); navDown(`method-${idx}`); }
+                    }}
                   >
                     {method.name}(): {method.type}
                   </span>
@@ -331,6 +413,8 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
             {adding === 'methods' ? (
               <AddRow
                 placeholder="name(): ReturnType"
+                onClose={() => { if (methodCount > 0) setEditing(`method-${methodCount - 1}`); else if (fieldCount > 0) setEditing(`field-${fieldCount - 1}`); else setEditing('name'); }}
+                onArrowDown={() => setAdding(null)}
                 onCommit={(v) => {
                   if (v.trim()) {
                     const match = v.match(/^(.*?)\(\)\s*:\s*(.+)$/);
