@@ -1,0 +1,65 @@
+# Codic - UML Diagram Editor
+
+## Project Overview
+React + TypeScript UML diagram editor with drag-and-drop canvas, inline editing, and Java code generation. Uses ReactFlow (@xyflow/react) for the diagram canvas, Supabase for auth/persistence, and Vite for bundling.
+
+## Tech Stack
+- React 19, TypeScript 6, Vite 8
+- @xyflow/react v12 (ReactFlow)
+- Supabase (auth, DB)
+- Prisma (schema, not actively used in frontend)
+- Zustand (available, not heavily used)
+- Lucide React (icons)
+
+## Architecture
+```
+src/
+  App.tsx              - Main app: Editor component (canvas, inspector, panels)
+  component/
+    UmlNodeCard.tsx    - ReactFlow node component with inline editing
+    Auth.tsx           - Login/signup/OTP pages
+    ProjectExplorer.tsx- Folder/project tree sidebar
+    AddNode.tsx        - Reference/example component (not used in main app)
+    edges/
+      InheritanceEdge.tsx  - Custom edge with triangle marker
+      CompositionEdge.tsx  - Custom edge with diamond marker
+  lib/
+    supabase.ts        - Supabase client, auth helpers, CRUD for projects/folders
+    AuthContext.tsx     - React auth provider
+    useAuth.ts         - Auth context hook
+    umlFactory.ts      - Factory functions for UML nodes/members
+    ids.ts             - ID generation utility
+    codegen/
+      parser.ts        - Text-to-UML node parser
+      java.ts          - Java code generator from UML diagram
+  types/
+    uml.ts             - TypeScript types (UmlNode, UmlEdge, UmlMember, etc.)
+```
+
+## Key Types (src/types/uml.ts)
+- `UmlNodeKind`: 'class' | 'interface' | 'enum' | 'abstract'
+- `UmlMember`: { id, visibility, name, type, isStatic?, isAbstract? }
+- `UmlNodeData`: { kind, name, packageName?, fields, methods, enumValues? }
+- `UmlNode`: Node<UmlNodeData, 'umlNode'> (ReactFlow Node)
+- `UmlRelationKind`: 'association' | 'aggregation' | 'composition' | 'inheritance' | 'implementation' | 'dependency'
+- `UmlEdge`: Edge<UmlEdgeData> (ReactFlow Edge)
+- `DiagramSnapshot`: { id?, folderId?, name, nodes, edges, updatedAt }
+
+## Conventions
+- Use `createMember()` and `createUmlNode()` from `lib/umlFactory.ts` for UML entities
+- Use `createId()` from `lib/ids.ts` for generating unique IDs
+- Node type is always `'umlNode'` for ReactFlow registration
+- Edge types: `'inheritance'`, `'composition'`, `'smoothstep'` (default)
+- Visibility: 'public' | 'private' | 'protected' | 'package' with symbols +, -, #, ~
+- Use `useNodesState` / `useEdgesState` from @xyflow/react for node/edge state
+- Theme toggling via `data-theme` attribute on `<html>` and localStorage key `uml:theme`
+
+## Environment Variables
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
+- If both are set, Supabase auth/persistence is used; otherwise falls back to localStorage
+
+## Commands
+- `npm run dev` - Start dev server
+- `npm run build` - TypeScript check + Vite build
+- `npm run lint` - ESLint
