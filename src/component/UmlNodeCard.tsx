@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { visibilitySymbol, createMember } from '../lib/umlFactory';
-import type { UmlNode, UmlVisibility, UmlNodeData } from '../types/uml';
+import type { UmlNode, UmlVisibility } from '../types/uml';
 
 const stereotype = {
   class: 'class',

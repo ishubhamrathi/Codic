@@ -32,7 +32,7 @@ export function CompositionEdge(props: EdgeProps) {
         path={edgePath}
         markerEnd={`url(#${markerId})`}
         style={{ stroke: '#64748b', strokeWidth: 1.5 }}
-        label={props.data?.label}
+        label={props.data?.label as string}
         labelX={labelX}
         labelY={labelY}
       />

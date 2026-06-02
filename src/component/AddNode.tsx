@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
     Background,
     ReactFlow,
@@ -7,11 +7,15 @@ import {
     addEdge,
     useReactFlow,
     ReactFlowProvider,
+    type Connection,
+    type Edge,
+    type Node,
+    type OnConnectEnd,
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
 
-const initialNodes = [
+const initialNodes: Node[] = [
     {
         id: '0',
         type: 'input',
@@ -22,40 +26,38 @@ const initialNodes = [
 
 let id = 1;
 const getId = () => `${id++}`;
-const nodeOrigin = [0.5, 0];
+const nodeOrigin: [number, number] = [0.5, 0];
 
 const AddNodeOnEdgeDrop = () => {
-    const reactFlowWrapper = useRef(null);
+    const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const { screenToFlowPosition } = useReactFlow();
     const onConnect = useCallback(
-        (params) => setEdges((eds) => addEdge(params, eds)),
+        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
         [],
     );
 
-    const onConnectEnd = useCallback(
-        (event, connectionState) => {
-            // when a connection is dropped on the pane it's not valid
+    const onConnectEnd: OnConnectEnd = useCallback(
+        (event: MouseEvent | TouchEvent, connectionState: any) => {
             if (!connectionState.isValid) {
-                // we need to remove the wrapper bounds, in order to get the correct position
-                const id = getId();
+                const nodeId = getId();
                 const { clientX, clientY } =
                     'changedTouches' in event ? event.changedTouches[0] : event;
-                const newNode = {
-                    id,
+                const newNode: Node = {
+                    id: nodeId,
+                    type: 'input',
                     position: screenToFlowPosition({
                         x: clientX,
                         y: clientY,
                     }),
-                    data: { label: `Node ${id}` },
-                    origin: [0.5, 0.0],
+                    data: { label: `Node ${nodeId}` },
                 };
 
                 setNodes((nds) => nds.concat(newNode));
                 setEdges((eds) =>
-                    eds.concat({ id, source: connectionState.fromNode.id, target: id }),
+                    eds.concat({ id: nodeId, source: connectionState.fromNode!.id, target: nodeId }),
                 );
             }
         },

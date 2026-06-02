@@ -8,7 +8,7 @@ const visibilityKeyword = {
 } as const;
 
 const keyword = (member: UmlMember) => {
-  const parts = [visibilityKeyword[member.visibility]];
+  const parts: string[] = [visibilityKeyword[member.visibility]];
   if (member.isStatic) parts.push('static');
   if (member.isAbstract) parts.push('abstract');
   return parts.filter(Boolean).join(' ');

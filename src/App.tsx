@@ -238,9 +238,9 @@ function Editor() {
   const [activePanel, setActivePanel] = useState<'explorer' | 'profile' | null>('explorer');
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [explorerRefreshKey, setExplorerRefreshKey] = useState(0);
-  const [allProjects, setAllProjects] = useState<DiagramSnapshot[]>([]);
-  const [allFolders, setAllFolders] = useState<FolderData[]>([]);
-  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [, setAllProjects] = useState<DiagramSnapshot[]>([]);
+  const [, setAllFolders] = useState<FolderData[]>([]);
+  const [, setThemeLoaded] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('uml:theme') as 'light' | 'dark' | null;
     const initial = saved || 'light';
