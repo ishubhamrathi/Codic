@@ -21,7 +21,10 @@ export function AuthPage() {
     try {
       await signIn(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      setError(msg.includes('Invalid login')
+        ? 'Invalid email or password!'
+        : msg);
     } finally {
       setLoading(false);
     }
@@ -41,10 +44,18 @@ export function AuthPage() {
     setLoading(true);
     setError('');
     try {
-      await signUp(email, password, displayName || undefined);
-      await sendOtp(email);
-      setSuccess('A verification code was sent to your email');
-      setStep('verify');
+      const result = await signUp(email, password, displayName || undefined);
+      if (result.user?.identities?.length === 0) {
+        setError('An account with this email already exists. Please sign in.');
+        return;
+      }
+      if (result.session) {
+        await signIn(email, password);
+      } else {
+        await sendOtp(email);
+        setSuccess('A verification code was sent to your email');
+        setStep('verify');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -93,7 +104,7 @@ export function AuthPage() {
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Shapes size={40} style={{ color: 'var(--accent)', marginBottom: '12px' }} />
-          <h1 style={{ margin: 0, fontSize: '24px' }}>UML Studio</h1>
+          <h1 style={{ margin: 0, fontSize: '24px' }}>Codic Studio</h1>
           <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: '14px' }}>
             {step === 'verify' ? 'Enter the code sent to your email' : 'Visual design to Java class code'}
           </p>
@@ -154,6 +165,8 @@ export function AuthPage() {
               <label style={{ marginBottom: '6px' }}>Email</label>
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -164,6 +177,8 @@ export function AuthPage() {
               <label style={{ marginBottom: '6px' }}>Password</label>
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -215,6 +230,8 @@ export function AuthPage() {
               <label style={{ marginBottom: '6px' }}>Email</label>
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -222,12 +239,15 @@ export function AuthPage() {
               />
             </div>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ marginBottom: '6px' }}>Display Name</label>
+              <label style={{ marginBottom: '6px' }}>Full Name</label>
               <input
                 type="text"
+                name="name"
+                autoComplete="name"
                 value={displayName}
+                required
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name (optional)"
+                placeholder="John Doe"
               />
             </div>
             <div style={{ marginBottom: '20px' }}>
@@ -312,11 +332,11 @@ function OAuthButtons({ onOAuth, loading }: { onOAuth: (p: OAuthProvider) => voi
 
   return (
     <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-      <button type="button" style={btnStyle} onClick={() => onOAuth('google')} disabled={loading}>
+      <button type="button" style={btnStyle} onClick={() => onOAuth('google')} disabled={loading || true}>
         <GoogleIcon />
         Google
       </button>
-      <button type="button" style={btnStyle} onClick={() => onOAuth('github')} disabled={loading}>
+      <button type="button" style={btnStyle} onClick={() => onOAuth('github')} disabled={loading || true}>
         <GitHubIcon />
         GitHub
       </button>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import {
   Background,
   Controls,
@@ -18,7 +18,7 @@ import { Code2, Download, MousePointer2, Save, Shapes, Sparkles } from 'lucide-r
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
@@ -151,6 +151,37 @@ function Editor() {
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const generatedCode = useMemo(() => generateJavaCode(nodes, edges), [nodes, edges]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isSupabaseConfigured) return;
+      const projects = await loadUserProjects();
+      if (cancelled) return;
+      if (projects.length > 0) {
+        const latest = projects[0];
+        setProjectId(latest.id ?? crypto.randomUUID());
+        setProjectFolderId(latest.folderId);
+        setProjectName(latest.name);
+        setNodes(latest.nodes);
+        setEdges(latest.edges);
+        setSelectedNodeId(latest.nodes[0]?.id);
+        setRecentProjectId(latest.id);
+      } else {
+        const saved = await saveDiagram({
+          id: crypto.randomUUID(),
+          name: projectName,
+          nodes,
+          edges,
+          updatedAt: new Date().toISOString(),
+        });
+        setProjectId(saved.id);
+        setRecentProjectId(saved.id);
+        setExplorerRefreshKey((k) => k + 1);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const userDisplayName = user?.user_metadata?.display_name
     || user?.email?.split('@')[0]
     || 'User';
@@ -205,6 +236,7 @@ function Editor() {
     });
     setProjectId(saved.id);
     setRecentProjectId(saved.id);
+    setExplorerRefreshKey((k) => k + 1);
     setStatus(isSupabaseConfigured ? 'Saved to Supabase' : 'Saved to browser storage');
   };
 
@@ -337,9 +369,6 @@ function Editor() {
               <Shapes size={16} />
               <span>Codic</span>
             </div>
-          </div>
-          <div className="topbar-center">
-            <span className="topbar-project-name">{projectName}</span>
           </div>
           <div className="topbar-right">
             <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>
