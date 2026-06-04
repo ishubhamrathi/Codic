@@ -623,12 +623,12 @@ function Editor() {
           <SidePanelToggle open={inspectorOpen} />
         </button>
         {inspectorOpen && (<>
-        <section>
+        <section className={`inspector-section${inspectorCollapsed.inspector ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('inspector')}>
             <InspectorChevron open={!inspectorCollapsed.inspector} /> Inspector
           </label>
-          {!inspectorCollapsed.inspector && (
-            selectedNode ? (
+          <div className="inspector-section-body">
+            {selectedNode ? (
               <>
                 <input value={selectedNode.data.name} onChange={(event) => updateSelectedNode({ name: event.target.value })} />
                 <select
@@ -683,76 +683,68 @@ function Editor() {
               </>
             ) : (
               <p>Select a node to edit it.</p>
-            )
-          )}
+            )}
+          </div>
         </section>
 
-        <section>
+        <section className={`inspector-section${inspectorCollapsed.textToVisual ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('textToVisual')}>
             <InspectorChevron open={!inspectorCollapsed.textToVisual} />
             <Sparkles size={14} /> Text to Visual
           </label>
-          {!inspectorCollapsed.textToVisual && (
-            <>
-              <textarea value={textInput} onChange={(event) => setTextInput(event.target.value)} rows={6} />
-              <button onClick={importText}>Generate nodes</button>
-            </>
-          )}
+          <div className="inspector-section-body">
+            <textarea value={textInput} onChange={(event) => setTextInput(event.target.value)} rows={6} />
+            <button onClick={importText}>Generate nodes</button>
+          </div>
         </section>
 
-        <section className="code-panel">
+        <section className={`inspector-section code-panel${inspectorCollapsed.code ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('code')}>
             <InspectorChevron open={!inspectorCollapsed.code} />
             <Code2 size={14} /> Java Code
           </label>
-          {!inspectorCollapsed.code && (
-            <>
-              <pre>{generatedCode}</pre>
-              <button onClick={() => navigator.clipboard.writeText(generatedCode)}>
-                <Download size={14} /> Copy
-              </button>
-              <button onClick={exportJson}>Export JSON</button>
-            </>
-          )}
+          <div className="inspector-section-body">
+            <pre>{generatedCode}</pre>
+            <button onClick={() => navigator.clipboard.writeText(generatedCode)}>
+              <Download size={14} /> Copy
+            </button>
+            <button onClick={exportJson}>Export JSON</button>
+          </div>
         </section>
 
-        <section>
+        <section className={`inspector-section${inspectorCollapsed.nodes ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('nodes')}>
             <InspectorChevron open={!inspectorCollapsed.nodes} /> Nodes
           </label>
-          {!inspectorCollapsed.nodes && (
-            <>
-              {(['class', 'abstract', 'interface', 'enum'] as UmlNodeKind[]).map((kind) => (
-                <button className="palette-item" draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
-                  <MousePointer2 size={14} />
-                  {kind}
-                </button>
-              ))}
-            </>
-          )}
+          <div className="inspector-section-body">
+            {(['class', 'abstract', 'interface', 'enum'] as UmlNodeKind[]).map((kind) => (
+              <button className="palette-item" draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
+                <MousePointer2 size={14} />
+                {kind}
+              </button>
+            ))}
+          </div>
         </section>
 
-        <section>
+        <section className={`inspector-section${inspectorCollapsed.relations ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('relations')}>
             <InspectorChevron open={!inspectorCollapsed.relations} /> Relation
           </label>
-          {!inspectorCollapsed.relations && (
-            <>
-              {relationOptions.map((rel) => (
-                <button
-                  key={rel}
-                  className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
-                  onClick={() => setSelectedRelation(rel)}
-                >
-                  <MousePointer2 size={14} />
-                  {rel}
-                </button>
-              ))}
-              {selectedRelation && selectedNodeId && (
-                <button onClick={startRelation}>Link selected to…</button>
-              )}
-            </>
-          )}
+          <div className="inspector-section-body">
+            {relationOptions.map((rel) => (
+              <button
+                key={rel}
+                className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
+                onClick={() => setSelectedRelation(rel)}
+              >
+                <MousePointer2 size={14} />
+                {rel}
+              </button>
+            ))}
+            {selectedRelation && selectedNodeId && (
+              <button onClick={startRelation}>Link selected to…</button>
+            )}
+          </div>
         </section>
         </>)}
       </aside>
