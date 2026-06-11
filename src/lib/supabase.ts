@@ -127,8 +127,11 @@ export const saveDiagram = async (diagram: DiagramSnapshot) => {
     user_id: user.id,
     folder_id: diagram.folderId ?? null,
     name: diagram.name,
+    type: diagram.type ?? 'uml',
     nodes: diagram.nodes,
     edges: diagram.edges,
+    tldraw_document: diagram.tldrawDocument ?? null,
+    excalidraw_document: diagram.excalidrawDocument ?? null,
     updated_at: diagram.updatedAt,
   };
 
@@ -139,8 +142,11 @@ export const saveDiagram = async (diagram: DiagramSnapshot) => {
     id: data.id as string,
     folderId: (data.folder_id as string | null) ?? undefined,
     name: data.name as string,
+    type: (data.type as 'uml' | 'freedraw' | 'excalidraw') ?? 'uml',
     nodes: data.nodes as DiagramSnapshot['nodes'],
     edges: data.edges as DiagramSnapshot['edges'],
+    tldrawDocument: data.tldraw_document ?? undefined,
+    excalidrawDocument: data.excalidraw_document ?? undefined,
     updatedAt: data.updated_at as string,
   };
 };
@@ -165,10 +171,45 @@ export const loadUserProjects = async (): Promise<DiagramSnapshot[]> => {
     id: row.id as string,
     folderId: (row.folder_id as string | null) ?? undefined,
     name: row.name as string,
+    type: (row.type as 'uml' | 'freedraw' | 'excalidraw') ?? 'uml',
     nodes: row.nodes as DiagramSnapshot['nodes'],
     edges: row.edges as DiagramSnapshot['edges'],
+    tldrawDocument: row.tldraw_document ?? undefined,
+    excalidrawDocument: row.excalidraw_document ?? undefined,
     updatedAt: row.updated_at as string,
   }));
+};
+
+export const loadProjectById = async (id: string): Promise<DiagramSnapshot | null> => {
+  if (!supabase) {
+    const raw = localStorage.getItem('uml:last-project');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DiagramSnapshot;
+    return parsed.id === id ? parsed : null;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('uml_projects')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single();
+  if (error || !data) return null;
+
+  return {
+    id: data.id as string,
+    folderId: (data.folder_id as string | null) ?? undefined,
+    name: data.name as string,
+    type: (data.type as 'uml' | 'freedraw' | 'excalidraw') ?? 'uml',
+    nodes: data.nodes as DiagramSnapshot['nodes'],
+    edges: data.edges as DiagramSnapshot['edges'],
+    tldrawDocument: data.tldraw_document ?? undefined,
+    excalidrawDocument: data.excalidraw_document ?? undefined,
+    updatedAt: data.updated_at as string,
+  };
 };
 
 export type FolderData = {
@@ -231,7 +272,16 @@ export const deleteFolder = async (id: string): Promise<void> => {
 };
 
 export const deleteProject = async (id: string): Promise<void> => {
-  if (!supabase) throw new Error('Supabase not configured');
+  if (!supabase) {
+    const raw = localStorage.getItem('uml:last-project');
+    if (raw) {
+      const parsed = JSON.parse(raw) as DiagramSnapshot;
+      if (parsed.id === id) {
+        localStorage.removeItem('uml:last-project');
+      }
+    }
+    return;
+  }
   const { error } = await supabase.from('uml_projects').delete().eq('id', id);
   if (error) throw error;
 };

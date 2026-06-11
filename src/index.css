@@ -814,3 +814,709 @@ label {
   .activity-bar { display: none; }
   .side-panel { left: 0; }
 }
+
+/* ── Canvas ──────────────────────────────────────── */
+.canvas { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+
+/* ── Excalidraw Canvas ─────────────────────────── */
+.excalidraw-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.excalidraw-canvas .excalidraw {
+  --ui-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Hide Excalidraw's default left toolbar */
+.excalidraw-canvas .excalidraw .App-menu__left,
+.excalidraw-canvas .excalidraw .App-menu__right,
+.excalidraw-canvas .excalidraw .ToolIcon,
+.excalidraw-canvas .excalidraw .color-picker,
+.excalidraw-canvas .excalidraw .App-toolbar {
+  display: none !important;
+}
+
+[data-theme="dark"] .excalidraw-canvas {
+  --is-background-dark: 1;
+}
+
+[data-theme="light"] .excalidraw-canvas {
+  --is-background-dark: 0;
+}
+
+/* ── Excalidraw Custom Bottom Bar ─────────────── */
+.excalidraw-bottom-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 50px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+[data-theme="dark"] .excalidraw-bottom-bar {
+  background: rgba(30, 26, 20, 0.92);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.excalidraw-tools,
+.excalidraw-colors,
+.excalidraw-strokes,
+.excalidraw-brushes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.excalidraw-separator {
+  width: 1px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .excalidraw-separator {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.excalidraw-tool-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  padding: 0;
+  min-height: auto;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+[data-theme="dark"] .excalidraw-tool-btn {
+  color: #e0d8c8;
+}
+
+.excalidraw-tool-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  transform: scale(1.08);
+}
+
+[data-theme="dark"] .excalidraw-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.excalidraw-tool-btn.active {
+  background: #333;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+[data-theme="dark"] .excalidraw-tool-btn.active {
+  background: #e0d8c8;
+  color: #1a1612;
+}
+
+.excalidraw-strokes {
+  gap: 4px;
+}
+
+.excalidraw-stroke-btn {
+  width: 36px;
+  height: 30px;
+  border: none;
+  border-radius: 50px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: auto;
+  transition: background 0.15s ease;
+}
+
+.excalidraw-stroke-btn span {
+  display: block;
+  width: 18px;
+  background: #555;
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn span {
+  background: #aaa;
+}
+
+.excalidraw-stroke-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.excalidraw-stroke-btn.active {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Brush Buttons (pen nib icons) ───────────── */
+.excalidraw-brush-group {
+  position: relative;
+}
+
+.excalidraw-brush-group::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 12px;
+  height: 100%;
+}
+
+.excalidraw-brush-popup {
+  display: none;
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+  z-index: 20;
+}
+
+[data-theme="dark"] .excalidraw-brush-popup {
+  background: rgba(30, 26, 20, 0.95);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.excalidraw-brush-group:hover .excalidraw-brush-popup {
+  display: flex;
+}
+
+.excalidraw-shape-group {
+  position: relative;
+}
+
+.excalidraw-shape-group::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  height: 12px;
+}
+
+.excalidraw-shape-popup {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  gap: 6px;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .excalidraw-shape-popup {
+  background: rgba(30, 26, 20, 0.95);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.excalidraw-shape-group:hover .excalidraw-shape-popup {
+  display: flex;
+}
+
+.excalidraw-brush-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: auto;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+[data-theme="dark"] .excalidraw-brush-btn {
+  color: #e0d8c8;
+}
+
+.excalidraw-brush-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  transform: scale(1.08);
+}
+
+[data-theme="dark"] .excalidraw-brush-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.excalidraw-brush-btn.active {
+  background: #333;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+[data-theme="dark"] .excalidraw-brush-btn.active {
+  background: #e0d8c8;
+  color: #1a1612;
+}
+
+.excalidraw-popup-label {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 4px;
+}
+
+[data-theme="dark"] .excalidraw-popup-label {
+  color: #888;
+}
+
+.excalidraw-popup-row {
+  display: flex;
+  gap: 4px;
+}
+
+.excalidraw-popup-btn {
+  width: 32px;
+  height: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: auto;
+  transition: background 0.1s;
+}
+
+[data-theme="dark"] .excalidraw-popup-btn {
+  color: #e0d8c8;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.excalidraw-popup-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.excalidraw-popup-btn.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
+
+[data-theme="dark"] .excalidraw-popup-btn.active {
+  background: #e0d8c8;
+  color: #1a1612;
+  border-color: #e0d8c8;
+}
+
+/* ── Color Group: 3 visible, expand to right on hover ── */
+.excalidraw-color-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.excalidraw-color-group::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 0;
+  width: 12px;
+  height: 100%;
+}
+
+.excalidraw-colors-visible {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.excalidraw-colors-expand {
+  display: none;
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+}
+
+[data-theme="dark"] .excalidraw-colors-expand {
+  background: rgba(30, 26, 20, 0.95);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.excalidraw-color-group:hover .excalidraw-colors-expand {
+  display: flex;
+}
+
+.excalidraw-color-btn {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  min-height: auto;
+  min-width: auto;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .excalidraw-color-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.excalidraw-color-btn:hover {
+  transform: scale(1.25);
+}
+
+.excalidraw-color-btn.active {
+  border-color: #fff;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .excalidraw-color-btn.active {
+  box-shadow: 0 0 0 2px #e0d8c8, 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.excalidraw-color-btn--white {
+  border-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .excalidraw-color-btn--white {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ── Shapes section ──────────────────────────── */
+.excalidraw-shapes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Stroke buttons ──────────────────────────── */
+.excalidraw-strokes {
+  gap: 4px;
+}
+
+.excalidraw-stroke-btn {
+  width: 36px;
+  height: 30px;
+  border: none;
+  border-radius: 50px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: auto;
+  transition: background 0.15s ease;
+}
+
+.excalidraw-stroke-btn span {
+  display: block;
+  width: 18px;
+  background: #555;
+  border-radius: 4px;
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn span {
+  background: #aaa;
+}
+
+.excalidraw-stroke-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.excalidraw-stroke-btn.active {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .excalidraw-stroke-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Free Draw Canvas ──────────────────────────── */
+.freedraw-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Hide tldraw's default toolbar */
+.freedraw-canvas .tlui-layout__top,
+.freedraw-canvas .tlui-layout__bottom,
+.freedraw-canvas .tlui-toolbar,
+.freedraw-canvas .tlui-tool-snap__button,
+.freedraw-canvas .tlui-actions__menu,
+.freedraw-canvas .tlui-page-menu__button,
+.freedraw-canvas .tlui-style-panel__wrapper {
+  display: none !important;
+}
+
+.freedraw-canvas .tl-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Create Project Modal ──────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 520px;
+  max-width: 90vw;
+  box-shadow: var(--shadow);
+}
+
+.modal-content h2 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal-content .file-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-content .file-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-content .file-type-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.file-type-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.uml-icon { background: #e0f2fe; color: #0369a1; }
+.draw-icon { background: #fef3c7; color: #d97706; }
+.excalidraw-icon { background: #ede9fe; color: #7c3aed; }
+
+[data-theme="dark"] .uml-icon { background: #0c4a6e; color: #7dd3fc; }
+[data-theme="dark"] .draw-icon { background: #78350f; color: #fcd34d; }
+[data-theme="dark"] .excalidraw-icon { background: #3b0764; color: #c4b5fd; }
+
+.file-type-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.file-type-desc {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.modal-name-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.modal-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── File Type Badges ────────────────────────────── */
+.topbar-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.topbar-type-badge--uml {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.topbar-type-badge--draw {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.topbar-type-badge--excalidraw {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+[data-theme="dark"] .topbar-type-badge--uml {
+  background: #0c4a6e;
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .topbar-type-badge--draw {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .topbar-type-badge--excalidraw {
+  background: #3b0764;
+  color: #c4b5fd;
+}
+
+.tree-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.tree-type-badge--excalidraw {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+[data-theme="dark"] .tree-type-badge--excalidraw {
+  background: #3b0764;
+  color: #c4b5fd;
+}
+
+/* ── Pen Tablet Shortcuts ──────────────────────── */
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.shortcut-keys {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.shortcut-desc {
+  color: var(--muted);
+  text-align: right;
+  font-size: 11px;
+}
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--border);
+}

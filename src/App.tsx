@@ -14,19 +14,23 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid } from 'lucide-react';
+import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid, Pen, Keyboard } from 'lucide-react';
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, type FolderData } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadProjectById, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, type FolderData } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
 import { AuthPage } from './component/Auth';
 import { ProjectExplorer } from './component/ProjectExplorer';
-import type { DiagramSnapshot, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
+import { CreateProjectModal } from './component/CreateProjectModal';
+import { FreeDrawCanvas } from './component/FreeDrawCanvas';
+import { ExcalidrawCanvas } from './component/ExcalidrawCanvas';
+import type { DiagramSnapshot, ProjectType, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
 import { InheritanceEdge } from './component/edges/InheritanceEdge';
 import { CompositionEdge } from './component/edges/CompositionEdge';
+import { ErrorBoundary } from './component/ErrorBoundary';
 
 const initialNodes: UmlNode[] = [
   {
@@ -254,6 +258,11 @@ function Editor() {
     nodes: false,
     relations: false,
   });
+  const [projectType, setProjectType] = useState<ProjectType>('uml');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalFolderId, setCreateModalFolderId] = useState<string | undefined>(undefined);
+  const [tldrawDocument, setTldrawDocument] = useState<Record<string, unknown> | null | undefined>(undefined);
+  const [excalidrawDocument, setExcalidrawDocument] = useState<unknown>(undefined);
   const { screenToFlowPosition } = useReactFlow();
 
   const toggleInspectorSection = (key: string) => {
@@ -292,7 +301,30 @@ function Editor() {
     let cancelled = false;
     (async () => {
       try {
+        const urlProjectId = new URLSearchParams(window.location.search).get('project');
+
         if (isSupabaseConfigured) {
+          if (urlProjectId) {
+            const project = await loadProjectById(urlProjectId);
+            if (cancelled) return;
+            if (project) {
+              setProjectId(project.id ?? crypto.randomUUID());
+              setProjectFolderId(project.folderId);
+              setProjectName(project.name);
+              setProjectType(project.type ?? 'uml');
+              setNodes(project.nodes);
+              setEdges(project.edges);
+              setTldrawDocument(project.tldrawDocument ?? undefined);
+              setExcalidrawDocument(project.excalidrawDocument ?? undefined);
+              setSelectedNodeId(project.nodes[0]?.id);
+              setRecentProjectId(project.id);
+              setAllProjects([]);
+              setAllFolders([]);
+              projectLoaded.current = true;
+              return;
+            }
+          }
+
           const [projects, folders] = await Promise.all([loadUserProjects(), loadFolders()]);
           if (cancelled) return;
           setAllProjects(projects);
@@ -302,10 +334,17 @@ function Editor() {
             setProjectId(latest.id ?? crypto.randomUUID());
             setProjectFolderId(latest.folderId);
             setProjectName(latest.name);
+            setProjectType(latest.type ?? 'uml');
             setNodes(latest.nodes);
             setEdges(latest.edges);
+            setTldrawDocument(latest.tldrawDocument ?? undefined);
+            setExcalidrawDocument(latest.excalidrawDocument ?? undefined);
             setSelectedNodeId(latest.nodes[0]?.id);
             setRecentProjectId(latest.id);
+            if (latest.id) {
+              history.replaceState(null, '', `?project=${latest.id}`);
+            }
+            projectLoaded.current = true;
             return;
           }
         }
@@ -314,10 +353,14 @@ function Editor() {
           setProjectId(local.id ?? crypto.randomUUID());
           setProjectFolderId(local.folderId);
           setProjectName(local.name);
+          setProjectType(local.type ?? 'uml');
           setNodes(local.nodes);
           setEdges(local.edges);
+          setTldrawDocument(local.tldrawDocument ?? undefined);
+          setExcalidrawDocument(local.excalidrawDocument ?? undefined);
           setSelectedNodeId(local.nodes[0]?.id);
           setRecentProjectId(local.id);
+          projectLoaded.current = true;
         }
       } finally {
         if (!cancelled) setDataLoading(false);
@@ -340,11 +383,35 @@ function Editor() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const handlePopState = async () => {
+      const urlProjectId = new URLSearchParams(window.location.search).get('project');
+      if (!urlProjectId || !isSupabaseConfigured) return;
+      const project = await loadProjectById(urlProjectId);
+      if (project) {
+        setProjectId(project.id ?? crypto.randomUUID());
+        setProjectFolderId(project.folderId);
+        setProjectName(project.name);
+        setProjectType(project.type ?? 'uml');
+        setNodes(project.nodes);
+        setEdges(project.edges);
+        setTldrawDocument(project.tldrawDocument ?? undefined);
+        setExcalidrawDocument(project.excalidrawDocument ?? undefined);
+        setSelectedNodeId(project.nodes[0]?.id);
+        setRecentProjectId(project.id);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipSave = useRef(true);
+  const projectLoaded = useRef(false);
 
   useEffect(() => {
     if (skipSave.current) { skipSave.current = false; return; }
+    if (!projectLoaded.current) return;
     if (!isSupabaseConfigured) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
@@ -353,8 +420,11 @@ function Editor() {
           id: projectId,
           folderId: projectFolderId,
           name: projectName,
+          type: projectType,
           nodes,
           edges,
+          tldrawDocument,
+          excalidrawDocument,
           updatedAt: new Date().toISOString(),
         });
         setStatus('Auto-saved');
@@ -364,7 +434,7 @@ function Editor() {
       }
     }, 1500);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [nodes, edges, projectName]);
+  }, [nodes, edges, projectName, projectType, tldrawDocument, excalidrawDocument]);
 
   const toggleTheme = async () => {
     const next = theme === 'light' ? 'dark' : 'light';
@@ -424,8 +494,11 @@ function Editor() {
       id: projectId,
       folderId: projectFolderId,
       name: projectName,
+      type: projectType,
       nodes,
       edges,
+      tldrawDocument,
+      excalidrawDocument,
       updatedAt: new Date().toISOString(),
     });
     setProjectId(saved.id);
@@ -444,32 +517,63 @@ function Editor() {
     setProjectId(project.id ?? crypto.randomUUID());
     setProjectFolderId(project.folderId);
     setProjectName(project.name);
+    setProjectType(project.type ?? 'uml');
     setNodes(project.nodes);
     setEdges(project.edges);
+    setTldrawDocument(project.tldrawDocument ?? undefined);
+    setExcalidrawDocument(project.excalidrawDocument ?? undefined);
     setSelectedNodeId(project.nodes[0]?.id);
     setRecentProjectId(project.id);
     setStatus('Loaded project');
+    projectLoaded.current = true;
+    if (project.id) {
+      history.pushState(null, '', `?project=${project.id}`);
+    }
   };
 
   const handleCreateProject = async (folderId?: string) => {
-    const name = prompt('Project name:');
-    if (!name) return;
+    setCreateModalFolderId(folderId);
+    setShowCreateModal(true);
+  };
+
+  const handleCreateProjectWithType = async (type: ProjectType, name: string) => {
+    setShowCreateModal(false);
     const id = crypto.randomUUID();
     setProjectId(id);
-    setProjectFolderId(folderId);
+    setProjectFolderId(createModalFolderId);
     setProjectName(name);
-    setNodes([]);
-    setEdges([]);
+    setProjectType(type);
+
+    if (type === 'uml') {
+      setNodes([]);
+      setEdges([]);
+      setTldrawDocument(undefined);
+      setExcalidrawDocument(undefined);
+    } else if (type === 'freedraw') {
+      setNodes([]);
+      setEdges([]);
+      setTldrawDocument(null);
+      setExcalidrawDocument(undefined);
+    } else {
+      setNodes([]);
+      setEdges([]);
+      setTldrawDocument(undefined);
+      setExcalidrawDocument(null);
+    }
+
     setStatus('New project created');
     await saveDiagram({
       id,
-      folderId,
+      folderId: createModalFolderId,
       name,
+      type,
       nodes: [],
       edges: [],
       updatedAt: new Date().toISOString(),
     });
     setExplorerRefreshKey((k) => k + 1);
+    projectLoaded.current = true;
+    history.pushState(null, '', `?project=${id}`);
   };
 
   const importText = () => {
@@ -485,13 +589,27 @@ function Editor() {
       id: projectId,
       folderId: projectFolderId,
       name: projectName,
+      type: projectType,
       nodes,
       edges,
+      tldrawDocument,
+      excalidrawDocument,
       updatedAt: new Date().toISOString(),
     };
     navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
     setStatus('Diagram JSON copied');
   };
+
+  const handleTldrawSnapshotChange = (snapshot: unknown) => {
+    setTldrawDocument(snapshot as Record<string, unknown> | null);
+  };
+
+  const handleExcalidrawChange = (elements: readonly unknown[], appState: unknown) => {
+    setExcalidrawDocument({ elements, appState });
+  };
+
+  const isUml = projectType === 'uml';
+  const isExcalidraw = projectType === 'excalidraw';
 
   const handleNodesChange = (changes: NodeChange<UmlNode>[]) => {
     onNodesChange(changes);
@@ -512,6 +630,13 @@ function Editor() {
 
   return (
     <main className={`app-layout ${!activePanel ? 'no-side-panel' : ''} ${!inspectorOpen ? 'inspector-collapsed' : ''}`}>
+      {showCreateModal && (
+        <CreateProjectModal
+          onSelect={(type, name) => handleCreateProjectWithType(type, name)}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
       {/* Activity Bar - leftmost narrow strip */}
       <div className="activity-bar">
         <div className="activity-bar-top">
@@ -540,6 +665,7 @@ function Editor() {
           <ProjectExplorer
             onLoadProject={loadProject}
             onCreateProject={handleCreateProject}
+            onProjectRenamed={(_id, name) => setProjectName(name)}
             currentProjectId={projectId}
             recentProjectId={recentProjectId}
             refreshKey={explorerRefreshKey}
@@ -586,35 +712,59 @@ function Editor() {
               <Shapes size={16} />
               <span>Codic</span>
             </div>
+            <span className={`topbar-type-badge ${isUml ? 'topbar-type-badge--uml' : isExcalidraw ? 'topbar-type-badge--excalidraw' : 'topbar-type-badge--draw'}`}>
+              {isUml ? 'UML' : isExcalidraw ? 'Excalidraw' : 'Free Draw'}
+            </span>
           </div>
           <div className="topbar-right">
-            <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>
-            <button className="topbar-btn" onClick={handleAutoArrange} title="Auto arrange">
-              <LayoutGrid size={14} />
-            </button>
+            {isUml && <span className="topbar-status">{nodes.length} nodes · {edges.length} relations</span>}
+            {isUml && (
+              <button className="topbar-btn" onClick={handleAutoArrange} title="Auto arrange">
+                <LayoutGrid size={14} />
+              </button>
+            )}
             <button className="topbar-btn" onClick={saveCurrentDiagram} title="Save">
               <Save size={14} />
             </button>
             <span className="topbar-dot">{status}</span>
           </div>
         </div>
-        <div className="canvas" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            fitView
-          >
-            <Background />
-            <MiniMap pannable zoomable />
-            <Controls />
-          </ReactFlow>
-        </div>
+        {isUml ? (
+          <div className="canvas" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              fitView
+            >
+              <Background />
+              <MiniMap pannable zoomable />
+              <Controls />
+            </ReactFlow>
+          </div>
+        ) : isExcalidraw ? (
+          <div className="canvas">
+            <ErrorBoundary>
+              <ExcalidrawCanvas
+                excalidrawDocument={excalidrawDocument}
+                onDocumentChange={handleExcalidrawChange}
+                theme={theme}
+              />
+            </ErrorBoundary>
+          </div>
+        ) : (
+          <div className="canvas">
+            <FreeDrawCanvas
+              tldrawDocument={tldrawDocument}
+              onSnapshotChange={handleTldrawSnapshotChange}
+            />
+          </div>
+        )}
       </section>
 
       {/* Inspector */}
@@ -623,6 +773,7 @@ function Editor() {
           <SidePanelToggle open={inspectorOpen} />
         </button>
         {inspectorOpen && (<>
+        {isUml && (
         <section className={`inspector-section${inspectorCollapsed.inspector ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('inspector')}>
             <InspectorChevron open={!inspectorCollapsed.inspector} /> Inspector
@@ -686,7 +837,9 @@ function Editor() {
             )}
           </div>
         </section>
+        )}
 
+        {isUml && (
         <section className={`inspector-section${inspectorCollapsed.textToVisual ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('textToVisual')}>
             <InspectorChevron open={!inspectorCollapsed.textToVisual} />
@@ -697,7 +850,9 @@ function Editor() {
             <button onClick={importText}>Generate nodes</button>
           </div>
         </section>
+        )}
 
+        {isUml && (
         <section className={`inspector-section code-panel${inspectorCollapsed.code ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('code')}>
             <InspectorChevron open={!inspectorCollapsed.code} />
@@ -711,7 +866,9 @@ function Editor() {
             <button onClick={exportJson}>Export JSON</button>
           </div>
         </section>
+        )}
 
+        {isUml && (
         <section className={`inspector-section${inspectorCollapsed.nodes ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('nodes')}>
             <InspectorChevron open={!inspectorCollapsed.nodes} /> Nodes
@@ -725,7 +882,9 @@ function Editor() {
             ))}
           </div>
         </section>
+        )}
 
+        {isUml && (
         <section className={`inspector-section${inspectorCollapsed.relations ? ' collapsed' : ''}`}>
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('relations')}>
             <InspectorChevron open={!inspectorCollapsed.relations} /> Relation
@@ -746,6 +905,145 @@ function Editor() {
             )}
           </div>
         </section>
+        )}
+
+        {!isUml && (
+        <section className="inspector-section">
+          <label className="inspector-section-header">
+            <Pen size={14} /> {isExcalidraw ? 'Excalidraw' : 'Free Draw'}
+          </label>
+          <div className="inspector-section-body">
+            <p style={{ fontSize: '12px', color: 'var(--muted)', margin: 0 }}>
+              {isExcalidraw
+                ? 'Use the toolbar on the left for hand-drawn style shapes, text, arrows, and freehand drawing.'
+                : 'Use the toolbar on the left to draw. Supports shapes, text, arrows, and freehand.'}
+            </p>
+          </div>
+        </section>
+        )}
+
+        {!isUml && (
+        <section className={`inspector-section${inspectorCollapsed.penTablet ? ' collapsed' : ''}`}>
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('penTablet')}>
+            <InspectorChevron open={!inspectorCollapsed.penTablet} />
+            <Keyboard size={14} /> Pen Tablet Setup
+          </label>
+          <div className="inspector-section-body">
+            <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 8px 0' }}>
+              In <strong>Huion Tablet</strong> software, map your pen buttons to these keys:
+            </p>
+            <div className="shortcut-list">
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Pen Btn 1 → E</kbd>
+                </span>
+                <span className="shortcut-desc">Eraser tool</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Pen Btn 2 → V</kbd>
+                </span>
+                <span className="shortcut-desc">Selection tool</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Eraser → E</kbd>
+                </span>
+                <span className="shortcut-desc">Toggle eraser on pen flip</span>
+              </div>
+            </div>
+            <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '12px 0 8px 0', fontWeight: 600 }}>
+              Keyboard Shortcuts:
+            </p>
+            <div className="shortcut-list">
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>P</kbd>
+                </span>
+                <span className="shortcut-desc">Pen / Freehand</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>E</kbd>
+                </span>
+                <span className="shortcut-desc">Eraser</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>V</kbd>
+                </span>
+                <span className="shortcut-desc">Selection</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>R</kbd>
+                </span>
+                <span className="shortcut-desc">Rectangle</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>O</kbd>
+                </span>
+                <span className="shortcut-desc">Ellipse</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>D</kbd>
+                </span>
+                <span className="shortcut-desc">Diamond</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>A</kbd>
+                </span>
+                <span className="shortcut-desc">Arrow</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>L</kbd>
+                </span>
+                <span className="shortcut-desc">Line</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>T</kbd>
+                </span>
+                <span className="shortcut-desc">Text</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>H</kbd>
+                </span>
+                <span className="shortcut-desc">Hand (Pan)</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Ctrl+Z</kbd>
+                </span>
+                <span className="shortcut-desc">Undo</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Ctrl+Shift+Z</kbd>
+                </span>
+                <span className="shortcut-desc">Redo</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Space+Drag</kbd>
+                </span>
+                <span className="shortcut-desc">Pan Canvas</span>
+              </div>
+              <div className="shortcut-item">
+                <span className="shortcut-keys">
+                  <kbd>Ctrl+Scroll</kbd>
+                </span>
+                <span className="shortcut-desc">Zoom</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        )}
         </>)}
       </aside>
     </main>

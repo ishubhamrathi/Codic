@@ -39,11 +39,16 @@ export type UmlEdgeData = {
 
 export type UmlEdge = Edge<UmlEdgeData>;
 
+export type ProjectType = 'uml' | 'freedraw' | 'excalidraw';
+
 export type DiagramSnapshot = {
   id?: string;
   folderId?: string;
   name: string;
+  type?: ProjectType;
   nodes: UmlNode[];
   edges: UmlEdge[];
+  tldrawDocument?: Record<string, unknown> | null;
+  excalidrawDocument?: unknown;
   updatedAt: string;
 };
