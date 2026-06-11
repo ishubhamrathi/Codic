@@ -12,32 +12,32 @@ type Props = {
 type ExcalidrawAPI = any;
 
 const BRUSH_TOOLS = [
-  { key: '1', label: 'Fine Liner', width: 1, icon: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="currentColor">
-      <path d="M16 2l1 7-1 2-1-2z" opacity="0.5"/>
-      <rect x="15.3" y="11" width="1.4" height="11" rx="0.3"/>
-      <circle cx="16" cy="24" r="0.8"/>
+  { key: '1', label: 'Fine', width: 1, icon: (
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="currentColor">
+      <path d="M16 2l1 8-1 2-1-2z" opacity="0.5"/>
+      <rect x="15.3" y="12" width="1.4" height="12" rx="0.3"/>
+      <circle cx="16" cy="26" r="1"/>
     </svg>
   )},
-  { key: '2', label: 'Fountain Pen', width: 2, icon: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="currentColor">
-      <path d="M16 2l2 8-2 2-2-2z" opacity="0.5"/>
-      <rect x="14.5" y="12" width="3" height="10" rx="0.5"/>
-      <path d="M14.5 22l1.5 4 1.5-4z" opacity="0.7"/>
+  { key: '2', label: 'Pen', width: 2, icon: (
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="currentColor">
+      <path d="M16 2l2.5 9-2.5 2.5-2.5-2.5z" opacity="0.5"/>
+      <rect x="14" y="13" width="4" height="11" rx="0.5"/>
+      <path d="M14 24l2 5 2-5z" opacity="0.7"/>
     </svg>
   )},
   { key: '3', label: 'Marker', width: 4, icon: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="currentColor">
-      <rect x="12" y="2" width="8" height="8" rx="1.5" opacity="0.5"/>
-      <path d="M12 10h8l1 9H11z" opacity="0.8"/>
-      <path d="M11 19h10l0.8 4H10.2z" opacity="0.6"/>
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="currentColor">
+      <rect x="11" y="2" width="10" height="8" rx="2" opacity="0.5"/>
+      <path d="M11 10h10l1.5 10H9.5z" opacity="0.8"/>
+      <rect x="10" y="20" width="12" height="4" rx="1" opacity="0.6"/>
     </svg>
   )},
-  { key: '4', label: 'Highlighter', width: 8, icon: (
-    <svg width="24" height="24" viewBox="0 0 32 32" fill="currentColor">
-      <rect x="11" y="2" width="10" height="7" rx="1.5" opacity="0.35"/>
-      <path d="M11 9h10v4l-1.5 9h-7L11 13z" opacity="0.3"/>
-      <rect x="12" y="22" width="8" height="3" rx="1" opacity="0.45"/>
+  { key: '4', label: 'Highlight', width: 8, icon: (
+    <svg width="28" height="28" viewBox="0 0 32 32" fill="currentColor">
+      <rect x="10" y="2" width="12" height="8" rx="2" opacity="0.35"/>
+      <path d="M10 10h12v5l-2 10h-8L10 15z" opacity="0.3"/>
+      <rect x="11" y="25" width="10" height="4" rx="1.5" opacity="0.45"/>
     </svg>
   )},
 ];
@@ -161,12 +161,73 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
     try { excalidrawAPIRef.current.updateScene({ appState: { currentItemFillStyle: fill } }); } catch { /* */ }
   }, []);
 
+  const scrollBrush = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = BRUSH_TOOLS.findIndex(b => b.width === activeBrush);
+    const next = e.deltaY > 0
+      ? BRUSH_TOOLS[(idx + 1) % BRUSH_TOOLS.length]
+      : BRUSH_TOOLS[(idx - 1 + BRUSH_TOOLS.length) % BRUSH_TOOLS.length];
+    selectBrush(next.width);
+  }, [activeBrush, selectBrush]);
+
+  const scrollColor = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cur = colorOrder;
+    const idx = cur.findIndex(c => c.hex === activeColor);
+    const next = e.deltaY > 0
+      ? cur[(idx + 1) % cur.length]
+      : cur[(idx - 1 + cur.length) % cur.length];
+    selectColor(next.hex);
+  }, [activeColor, colorOrder, selectColor]);
+
+  const [zoom, setZoom] = useState(100);
+
+  const getZoom = useCallback(() => {
+    if (!excalidrawAPIRef.current) return 100;
+    try {
+      const state = excalidrawAPIRef.current.getState();
+      return Math.round((state?.appState?.zoom?.value ?? 1) * 100);
+    } catch { return 100; }
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    if (!excalidrawAPIRef.current) return;
+    try {
+      const cur = getZoom() / 100;
+      const next = Math.min(cur * 1.2, 5);
+      excalidrawAPIRef.current.updateScene({ appState: { zoom: { value: next } } });
+      setZoom(Math.round(next * 100));
+    } catch { /* */ }
+  }, [getZoom]);
+
+  const zoomOut = useCallback(() => {
+    if (!excalidrawAPIRef.current) return;
+    try {
+      const cur = getZoom() / 100;
+      const next = Math.max(cur / 1.2, 0.1);
+      excalidrawAPIRef.current.updateScene({ appState: { zoom: { value: next } } });
+      setZoom(Math.round(next * 100));
+    } catch { /* */ }
+  }, [getZoom]);
+
+  const zoomBy5 = useCallback((dir: number) => {
+    if (!excalidrawAPIRef.current) return;
+    try {
+      const cur = getZoom();
+      const next = Math.max(10, Math.min(500, cur + dir * 5));
+      excalidrawAPIRef.current.updateScene({ appState: { zoom: { value: next / 100 } } });
+      setZoom(next);
+    } catch { /* */ }
+  }, [getZoom]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key.toLowerCase();
       const toolMap: Record<string, string> = {
-        v: 'selection', p: 'freedraw', e: 'eraser',
+        v: 'selection', h: 'hand', p: 'freedraw', e: 'eraser',
         r: 'rectangle', o: 'ellipse', a: 'arrow', l: 'line', t: 'text',
       };
       if (toolMap[key]) setActiveTool(toolMap[key]);
@@ -190,8 +251,14 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
     </svg>
   );
 
+  const cursorClass = activeTool === 'freedraw' ? 'cursor-pen'
+    : activeTool === 'eraser' ? 'cursor-eraser'
+    : activeTool === 'hand' ? 'cursor-hand'
+    : activeTool === 'selection' ? 'cursor-select'
+    : '';
+
   return (
-    <div className="excalidraw-canvas">
+    <div className={`excalidraw-canvas ${cursorClass}`}>
       <Excalidraw
         excalidrawAPI={(api: ExcalidrawAPI) => { excalidrawAPIRef.current = api; }}
         initialData={initialData as never}
@@ -206,7 +273,35 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
         }}
       />
 
+      <div className="excalidraw-zoom-float">
+        <button className="excalidraw-zoom-btn" onClick={zoomOut} title="Zoom Out (-)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button className="excalidraw-zoom-pct" onClick={() => zoomBy5(-1)} title="Decrease by 5">
+          {zoom}%
+        </button>
+        <button className="excalidraw-zoom-btn" onClick={zoomIn} title="Zoom In (+)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
       <div className="excalidraw-bottom-bar">
+        {/* Hand tool */}
+        <button className={`excalidraw-tool-btn ${activeTool === 'hand' ? 'active' : ''}`}
+          onClick={() => selectTool('hand')} title="Hand (H)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 11V6a2 2 0 00-4 0v1"/>
+            <path d="M14 10V4a2 2 0 00-4 0v6"/>
+            <path d="M10 10.5V6a2 2 0 00-4 0v8"/>
+            <path d="M18 8a2 2 0 014 0v5a8 8 0 01-8 8h-2c-2.5 0-3.5-.5-5.5-2L4.5 15a1.5 1.5 0 012-2l2 2"/>
+          </svg>
+        </button>
+
         {/* Select */}
         <button className={`excalidraw-tool-btn ${activeTool === 'selection' ? 'active' : ''}`}
           onClick={() => selectTool('selection')} title="Select (V)">
@@ -229,12 +324,13 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
               <circle cx="9" cy="26" r="1.5"/>
             </svg>
           </button>
-          <div className="excalidraw-brush-popup">
+          <div className="excalidraw-brush-popup" onWheel={scrollBrush}>
             {BRUSH_TOOLS.map((b) => (
               <button key={b.key}
                 className={`excalidraw-brush-btn ${activeTool === 'freedraw' && activeBrush === b.width ? 'active' : ''}`}
-                onClick={() => selectBrush(b.width)} title={b.label} style={{ color: activeColor }}>
+                onClick={() => selectBrush(b.width)} title={b.label}>
                 {b.icon}
+                <span className="excalidraw-brush-label">{b.label}</span>
               </button>
             ))}
           </div>
@@ -251,7 +347,7 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
         <div className="excalidraw-separator" />
 
         {/* Colors */}
-        <div className="excalidraw-color-group">
+        <div className="excalidraw-color-group" onWheel={scrollColor}>
           <div className="excalidraw-colors-visible">
             {colorOrder.slice(0, 3).map((c) => (
               <button key={c.hex}
