@@ -27,6 +27,7 @@ import { ProjectExplorer } from './component/ProjectExplorer';
 import { CreateProjectModal } from './component/CreateProjectModal';
 import { FreeDrawCanvas } from './component/FreeDrawCanvas';
 import { ExcalidrawCanvas } from './component/ExcalidrawCanvas';
+import { InputModal } from './component/Dialogs';
 import type { DiagramSnapshot, ProjectType, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
 import { InheritanceEdge } from './component/edges/InheritanceEdge';
 import { CompositionEdge } from './component/edges/CompositionEdge';
@@ -258,6 +259,7 @@ function Editor() {
     nodes: false,
     relations: false,
   });
+  const [relationModalOpen, setRelationModalOpen] = useState(false);
   const [projectType, setProjectType] = useState<ProjectType>('uml');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalFolderId, setCreateModalFolderId] = useState<string | undefined>(undefined);
@@ -271,7 +273,11 @@ function Editor() {
 
   const startRelation = () => {
     if (!selectedNodeId) return;
-    const targetId = prompt('Target node ID:');
+    setRelationModalOpen(true);
+  };
+
+  const handleRelationConfirm = (targetId: string) => {
+    setRelationModalOpen(false);
     if (!targetId || targetId === selectedNodeId) return;
     const targetNode = nodes.find((n) => n.id === targetId);
     if (!targetNode) return;
@@ -412,7 +418,6 @@ function Editor() {
   useEffect(() => {
     if (skipSave.current) { skipSave.current = false; return; }
     if (!projectLoaded.current) return;
-    if (!isSupabaseConfigured) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
       try {
@@ -634,6 +639,15 @@ function Editor() {
         <CreateProjectModal
           onSelect={(type, name) => handleCreateProjectWithType(type, name)}
           onClose={() => setShowCreateModal(false)}
+        />
+      )}
+      {relationModalOpen && (
+        <InputModal
+          title="Add Relation"
+          placeholder="Target node ID (e.g. class-user)"
+          confirmLabel="Connect"
+          onConfirm={handleRelationConfirm}
+          onCancel={() => setRelationModalOpen(false)}
         />
       )}
 

@@ -1405,6 +1405,94 @@ label {
   text-align: center;
 }
 
+/* ── Dialog Modals ────────────────────────────── */
+.modal-dialog {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 360px;
+  max-width: 90vw;
+  box-shadow: var(--shadow);
+}
+
+.modal-dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.modal-dialog-message {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-dialog-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  margin-bottom: 20px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.modal-dialog-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.modal-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-dialog-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--panel);
+  color: var(--fg);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-dialog-btn:hover {
+  background: var(--bg);
+}
+
+.modal-dialog-btn--cancel {
+  background: transparent;
+}
+
+.modal-dialog-btn--confirm {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.modal-dialog-btn--confirm:hover {
+  opacity: 0.9;
+}
+
+.modal-dialog-btn--danger {
+  background: #e03131;
+  color: #fff;
+  border-color: #e03131;
+}
+
+.modal-dialog-btn--danger:hover {
+  opacity: 0.9;
+}
+
 .modal-name-input {
   width: 100%;
   padding: 8px 12px;

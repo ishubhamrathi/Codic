@@ -10,6 +10,7 @@ import {
   type FolderData,
 } from '../lib/supabase';
 import type { DiagramSnapshot } from '../types/uml';
+import { ConfirmModal, InputModal } from './Dialogs';
 
 function FolderIcon({ open }: { open: boolean }) {
   return (
@@ -113,6 +114,8 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [loading, setLoading] = useState(true);
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'folder' | 'project' } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,21 +139,25 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
     });
   };
 
-  const handleCreateFolder = async (parentId?: string) => {
-    const name = prompt('Folder name:');
-    if (!name) return;
-    const folder = await createFolder(name, parentId);
-    setFolders((prev) => [...prev, folder]);
-    if (parentId) setExpandedFolders((prev) => new Set(prev).add(parentId));
+  const handleCreateFolder = async (_parentId?: string) => {
+    setFolderModalOpen(true);
+  };
+
+  const handleFolderModalConfirm = async (name: string) => {
+    setFolderModalOpen(false);
+    try {
+      const folder = await createFolder(name);
+      setFolders((prev) => [...prev, folder]);
+    } catch { /* */ }
   };
 
   const handleRename = async (id: string, type: 'folder' | 'project') => {
     if (!renameValue.trim()) return;
     if (type === 'folder') {
-      await renameFolder(id, renameValue);
+      try { await renameFolder(id, renameValue); } catch { /* localStorage fallback */ }
       setFolders((prev) => prev.map((f) => f.id === id ? { ...f, name: renameValue } : f));
     } else {
-      await renameProject(id, renameValue);
+      try { await renameProject(id, renameValue); } catch { /* localStorage fallback */ }
       setProjects((prev) => prev.map((p) => p.id === id ? { ...p, name: renameValue } : p));
       if (id === currentProjectId) {
         onProjectRenamed?.(id, renameValue);
@@ -159,8 +166,14 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
     setRenamingId(null);
   };
 
-  const handleDelete = async (id: string, type: 'folder' | 'project') => {
-    if (!confirm(type === 'folder' ? 'Delete folder and contents?' : 'Delete project?')) return;
+  const handleDelete = (id: string, type: 'folder' | 'project') => {
+    setDeleteTarget({ id, type });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const { id, type } = deleteTarget;
+    setDeleteTarget(null);
     try {
       if (type === 'folder') {
         await deleteFolder(id);
@@ -256,11 +269,32 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
 
   return (
     <div className="panel-explorer">
+      {folderModalOpen && (
+        <InputModal
+          title="New Folder"
+          placeholder="Folder name"
+          confirmLabel="Create"
+          onConfirm={handleFolderModalConfirm}
+          onCancel={() => setFolderModalOpen(false)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmModal
+          title={deleteTarget.type === 'folder' ? 'Delete Folder?' : 'Delete Project?'}
+          message={deleteTarget.type === 'folder'
+            ? 'This will delete the folder and all its contents. This action cannot be undone.'
+            : 'This project will be permanently deleted. This action cannot be undone.'}
+          confirmLabel="Delete"
+          danger
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
       <div className="panel-explorer-header">
         <span>Explorer</span>
         <div className="panel-explorer-header-actions">
           <button className="panel-icon-btn" onClick={() => onCreateProject()} title="New file"><FilePlusIcon /></button>
-          <button className="panel-icon-btn" onClick={() => handleCreateFolder()} title="New folder"><PlusIcon /></button>
+          <button className="panel-icon-btn" onClick={() => setFolderModalOpen(true)} title="New folder"><PlusIcon /></button>
         </div>
       </div>
       <div className="panel-explorer-tree">
