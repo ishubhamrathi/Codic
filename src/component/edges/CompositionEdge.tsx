@@ -1,7 +1,7 @@
 import { BaseEdge, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 
 export function CompositionEdge(props: EdgeProps) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
     targetX: props.targetX,
@@ -32,9 +32,6 @@ export function CompositionEdge(props: EdgeProps) {
         path={edgePath}
         markerEnd={`url(#${markerId})`}
         style={{ stroke: '#64748b', strokeWidth: 1.5 }}
-        label={props.data?.label as string}
-        labelX={labelX}
-        labelY={labelY}
       />
     </>
   );

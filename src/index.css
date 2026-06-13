@@ -10,6 +10,10 @@
   --danger: #b91c1c;
   --shadow: 0 14px 34px rgba(60, 40, 10, 0.08);
   --activity-bg: #ede8de;
+  --node-class: #3b82f6;
+  --node-interface: #10b981;
+  --node-abstract: #8b5cf6;
+  --node-enum: #f59e0b;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -31,6 +35,10 @@
   --danger: #ef4444;
   --shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
   --activity-bg: #1e1a14;
+  --node-class: #60a5fa;
+  --node-interface: #34d399;
+  --node-abstract: #a78bfa;
+  --node-enum: #fbbf24;
 }
 
 * { box-sizing: border-box; }
@@ -366,6 +374,8 @@ label {
 .tree-item--recent { background: var(--accent-soft); }
 .tree-item--recent:hover { background: var(--accent-soft); opacity: 0.8; }
 .tree-item--file { font-weight: 400; }
+.tree-item--dragging { opacity: 0.4; }
+.tree-item--drag-over { outline: 1.5px solid var(--accent); outline-offset: -1.5px; background: var(--accent-soft); }
 
 .tree-label {
   flex: 1;
@@ -493,7 +503,6 @@ label {
   font-size: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   padding: 0;
-  overflow: hidden;
 }
 .uml-node.selected {
   border-color: var(--accent);
@@ -514,6 +523,10 @@ label {
   opacity: 0.8;
   text-transform: lowercase;
 }
+.uml-node__header--class { background: var(--node-class); }
+.uml-node__header--interface { background: var(--node-interface); }
+.uml-node__header--abstract { background: var(--node-abstract); }
+.uml-node__header--enum { background: var(--node-enum); }
 .uml-node__section {
   padding: 6px 10px;
   border-top: 1px solid var(--border);
@@ -686,6 +699,39 @@ label {
   justify-content: flex-start;
   text-transform: capitalize;
 }
+.palette-item--class { border-left: 3px solid var(--node-class); }
+.palette-item--interface { border-left: 3px solid var(--node-interface); }
+.palette-item--abstract { border-left: 3px solid var(--node-abstract); }
+.palette-item--enum { border-left: 3px solid var(--node-enum); }
+
+.palette-item--active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.relation-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.relation-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.relation-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 2px 0;
+}
 
 .code-panel pre {
   background: var(--panel-strong);
@@ -712,6 +758,126 @@ label {
 [data-theme="dark"] .react-flow__background {
   background-color: var(--bg) !important;
 }
+
+/* ── ReactFlow Handles (Connection Arrows) ─────── */
+.react-flow__handle {
+  width: 28px !important;
+  height: 28px !important;
+  background: transparent !important;
+  border: none !important;
+  z-index: 10;
+}
+
+/* Small dot on border */
+.uml-handle-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+/* Arrow */
+.uml-handle-arrow {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+/* ── Position: Top ─────────────────────────────── */
+.react-flow__handle-top {
+  top: -12px !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+}
+.react-flow__handle-top .uml-handle-dot {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.react-flow__handle-top .uml-handle-arrow {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+/* ── Position: Bottom ──────────────────────────── */
+.react-flow__handle-bottom {
+  bottom: -12px !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+}
+.react-flow__handle-bottom .uml-handle-dot {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.react-flow__handle-bottom .uml-handle-arrow {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(0deg);
+}
+
+/* ── Position: Left ────────────────────────────── */
+.react-flow__handle-left {
+  left: -12px !important;
+  top: 50% !important;
+  transform: translateY(-50%);
+}
+.react-flow__handle-left .uml-handle-dot {
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.react-flow__handle-left .uml-handle-arrow {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* ── Position: Right ───────────────────────────── */
+.react-flow__handle-right {
+  right: -12px !important;
+  top: 50% !important;
+  transform: translateY(-50%);
+}
+.react-flow__handle-right .uml-handle-dot {
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.react-flow__handle-right .uml-handle-arrow {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+/* ── Hover: dot → arrow ────────────────────────── */
+.uml-node:hover .uml-handle-dot {
+  opacity: 0;
+}
+.uml-node:hover .uml-handle-arrow {
+  opacity: 1;
+}
+
+/* ── While connecting from a handle ────────────── */
+.react-flow__handle.connecting .uml-handle-dot {
+  opacity: 0;
+}
+.react-flow__handle.connecting .uml-handle-arrow {
+  opacity: 1;
+}
+
+/* ── Connection line ───────────────────────────── */
+.react-flow__connection-path {
+  stroke: var(--accent) !important;
+  stroke-width: 2 !important;
+  stroke-dasharray: 5 3;
+}
 [data-theme="dark"] .react-flow__minimap {
   background: var(--panel) !important;
   border-color: var(--border);
@@ -736,10 +902,6 @@ label {
 }
 [data-theme="dark"] .react-flow__edge-path {
   stroke: var(--muted) !important;
-}
-[data-theme="dark"] .react-flow__handle {
-  background: var(--accent) !important;
-  border-color: var(--panel) !important;
 }
 [data-theme="dark"] .react-flow__attribution {
   background: var(--panel) !important;

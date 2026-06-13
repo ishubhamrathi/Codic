@@ -1,6 +1,6 @@
 import { BaseEdge, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 
-export function InheritanceEdge(props: EdgeProps) {
+export function ImplementationEdge(props: EdgeProps) {
   const [edgePath] = getSmoothStepPath({
     sourceX: props.sourceX,
     sourceY: props.sourceY,
@@ -11,7 +11,7 @@ export function InheritanceEdge(props: EdgeProps) {
     borderRadius: 8,
   });
 
-  const markerId = `inheritance-${props.id}`;
+  const markerId = `implementation-${props.id}`;
 
   return (
     <>
@@ -31,7 +31,7 @@ export function InheritanceEdge(props: EdgeProps) {
       <BaseEdge
         path={edgePath}
         markerEnd={`url(#${markerId})`}
-        style={{ stroke: '#64748b', strokeWidth: 1.5 }}
+        style={{ stroke: '#64748b', strokeWidth: 1.5, strokeDasharray: '5 3' }}
       />
     </>
   );

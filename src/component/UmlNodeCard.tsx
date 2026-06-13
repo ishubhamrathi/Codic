@@ -3,6 +3,19 @@ import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { visibilitySymbol, createMember } from '../lib/umlFactory';
 import type { UmlNode, UmlVisibility } from '../types/uml';
 
+function HandleArrow() {
+  return (
+    <>
+      <span className="uml-handle-dot" />
+      <span className="uml-handle-arrow">
+        <svg width="14" height="10" viewBox="0 0 14 10" style={{ pointerEvents: 'none' }}>
+          <path d="M 7 10 L 0 0 L 14 0 Z" fill="var(--accent)" />
+        </svg>
+      </span>
+    </>
+  );
+}
+
 const stereotype = {
   class: 'class',
   abstract: 'abstract',
@@ -214,8 +227,9 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
         if (!editing && !adding) setEditing('name');
       }}
     >
-      <Handle type="target" position={Position.Top} />
-      <div className="uml-node__header">
+      <Handle type="source" position={Position.Top} className="uml-handle" connectableStart connectableEnd><HandleArrow /></Handle>
+      <Handle type="source" position={Position.Left} className="uml-handle" connectableStart connectableEnd><HandleArrow /></Handle>
+      <div className={`uml-node__header uml-node__header--${data.kind}`}>
         <span>{`<<${stereotype[data.kind]}>>`}</span>
         {editing === 'name' ? (
           <InlineEdit
@@ -434,7 +448,8 @@ export function UmlNodeCard({ id, data, selected }: NodeProps<UmlNode>) {
           </div>
         </>
       )}
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} className="uml-handle" connectableStart connectableEnd><HandleArrow /></Handle>
+      <Handle type="source" position={Position.Right} className="uml-handle" connectableStart connectableEnd><HandleArrow /></Handle>
     </div>
   );
 }

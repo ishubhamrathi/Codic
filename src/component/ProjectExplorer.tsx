@@ -7,6 +7,8 @@ import {
   deleteFolder,
   renameProject,
   deleteProject,
+  duplicateProject,
+  moveProject,
   type FolderData,
 } from '../lib/supabase';
 import type { DiagramSnapshot } from '../types/uml';
@@ -89,6 +91,15 @@ function TrashIcon() {
   );
 }
 
+function DuplicateIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="5" width="9" height="9" rx="1" />
+      <path d="M11 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2" />
+    </svg>
+  );
+}
+
 function ClockIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#ca8a04" strokeWidth="1.5" strokeLinecap="round">
@@ -116,6 +127,8 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
   const [loading, setLoading] = useState(true);
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'folder' | 'project' } | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +201,64 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
     }
   };
 
+  const handleDuplicate = async (project: DiagramSnapshot) => {
+    try {
+      const dup = await duplicateProject(project);
+      setProjects((prev) => [...prev, dup]);
+    } catch (e) {
+      console.warn('Duplicate failed:', e);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData('text/plain', projectId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingId(projectId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverFolderId(null);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolderId(folderId);
+  };
+
+  const handleFolderDragLeave = () => {
+    setDragOverFolderId(null);
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    const projectId = e.dataTransfer.getData('text/plain');
+    if (!projectId) return;
+    setDragOverFolderId(null);
+    setDraggingId(null);
+    try {
+      await moveProject(projectId, folderId);
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, folderId } : p));
+    } catch (err) {
+      console.warn('Move failed:', err);
+    }
+  };
+
+  const handleRootDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    const projectId = e.dataTransfer.getData('text/plain');
+    if (!projectId) return;
+    setDragOverFolderId(null);
+    setDraggingId(null);
+    try {
+      await moveProject(projectId, null);
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, folderId: undefined } : p));
+    } catch (err) {
+      console.warn('Move to root failed:', err);
+    }
+  };
+
   const rootFolders = folders.filter((f) => !f.parentId);
   const rootProjects = projects.filter((p) => !p.folderId);
   const getChildren = (folderId: string) => ({
@@ -216,7 +287,14 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
 
     return (
       <div key={folder.id}>
-        <div className="tree-item" style={{ paddingLeft: `${8 + depth * 12}px` }} onClick={() => toggleFolder(folder.id)}>
+        <div
+          className={`tree-item ${dragOverFolderId === folder.id ? 'tree-item--drag-over' : ''}`}
+          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          onClick={() => toggleFolder(folder.id)}
+          onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+          onDragLeave={handleFolderDragLeave}
+          onDrop={(e) => handleFolderDrop(e, folder.id)}
+        >
           <ChevronIcon open={open} />
           <FolderIcon open={open} />
           {renamingId === folder.id
@@ -248,9 +326,12 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
     return (
       <div
         key={project.id}
-        className={`tree-item tree-item--file ${isCurrent ? 'tree-item--active' : ''} ${isRecent ? 'tree-item--recent' : ''}`}
+        className={`tree-item tree-item--file ${isCurrent ? 'tree-item--active' : ''} ${isRecent ? 'tree-item--recent' : ''} ${draggingId === project.id ? 'tree-item--dragging' : ''}`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onLoadProject(project)}
+        draggable
+        onDragStart={(e) => project.id && handleDragStart(e, project.id)}
+        onDragEnd={handleDragEnd}
       >
         {isFreeDraw || isExcalidraw ? <DrawFileIcon /> : <FileIcon />}
         {renamingId === project.id
@@ -260,6 +341,7 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
         {isExcalidraw && <span className="tree-type-badge tree-type-badge--excalidraw">excalidraw</span>}
         {isRecent && <ClockIcon />}
         <div className="tree-actions">
+          <button onClick={(e) => { e.stopPropagation(); handleDuplicate(project); }} title="Duplicate"><DuplicateIcon /></button>
           <button onClick={(e) => { e.stopPropagation(); setRenamingId(project.id ?? ''); setRenameValue(project.name); }} title="Rename"><PencilIcon /></button>
           <button onClick={(e) => { e.stopPropagation(); project.id && handleDelete(project.id, 'project'); }} title="Delete"><TrashIcon /></button>
         </div>
@@ -297,7 +379,11 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
           <button className="panel-icon-btn" onClick={() => setFolderModalOpen(true)} title="New folder"><PlusIcon /></button>
         </div>
       </div>
-      <div className="panel-explorer-tree">
+      <div
+        className="panel-explorer-tree"
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+        onDrop={handleRootDrop}
+      >
         {loading
           ? <span className="panel-empty">Loading...</span>
           : rootFolders.length === 0 && rootProjects.length === 0

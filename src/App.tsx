@@ -31,6 +31,10 @@ import { InputModal } from './component/Dialogs';
 import type { DiagramSnapshot, ProjectType, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
 import { InheritanceEdge } from './component/edges/InheritanceEdge';
 import { CompositionEdge } from './component/edges/CompositionEdge';
+import { ImplementationEdge } from './component/edges/ImplementationEdge';
+import { AggregationEdge } from './component/edges/AggregationEdge';
+import { AssociationEdge } from './component/edges/AssociationEdge';
+import { DependencyEdge } from './component/edges/DependencyEdge';
 import { ErrorBoundary } from './component/ErrorBoundary';
 
 const initialNodes: UmlNode[] = [
@@ -63,14 +67,20 @@ const initialEdges: UmlEdge[] = [
     id: 'edge-user-auth',
     source: 'class-user',
     target: 'interface-auth',
-    type: 'smoothstep',
-    label: 'implements',
-    data: { relation: 'implementation', label: 'implements' },
+    type: 'implementation',
+    data: { relation: 'implementation' },
   },
 ];
 
 const nodeTypes = { umlNode: UmlNodeCard };
-const edgeTypes = { inheritance: InheritanceEdge, composition: CompositionEdge };
+const edgeTypes = {
+  inheritance: InheritanceEdge,
+  composition: CompositionEdge,
+  implementation: ImplementationEdge,
+  aggregation: AggregationEdge,
+  association: AssociationEdge,
+  dependency: DependencyEdge,
+};
 const relationOptions: UmlRelationKind[] = [
   'association',
   'aggregation',
@@ -281,9 +291,7 @@ function Editor() {
     if (!targetId || targetId === selectedNodeId) return;
     const targetNode = nodes.find((n) => n.id === targetId);
     if (!targetNode) return;
-    const edgeType = (selectedRelation === 'inheritance' || selectedRelation === 'composition')
-      ? selectedRelation
-      : 'smoothstep';
+    const edgeType = selectedRelation;
     setEdges((current) =>
       addEdge(
         {
@@ -291,8 +299,7 @@ function Editor() {
           source: selectedNodeId,
           target: targetId,
           type: edgeType as any,
-          label: selectedRelation,
-          data: { relation: selectedRelation, label: selectedRelation },
+          data: { relation: selectedRelation },
         },
         current,
       ),
@@ -455,16 +462,12 @@ function Editor() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const edgeType = (selectedRelation === 'inheritance' || selectedRelation === 'composition')
-        ? selectedRelation
-        : 'smoothstep';
       setEdges((current) =>
         addEdge(
           {
             ...connection,
-            type: edgeType as any,
-            label: selectedRelation,
-            data: { relation: selectedRelation, label: selectedRelation },
+            type: selectedRelation as any,
+            data: { relation: selectedRelation },
           },
           current,
         ),
@@ -754,6 +757,8 @@ function Editor() {
               onEdgesChange={handleEdgesChange}
               onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              connectionLineType="straight"
+              connectionMode="loose"
               fitView
             >
               <Background />
@@ -889,7 +894,7 @@ function Editor() {
           </label>
           <div className="inspector-section-body">
             {(['class', 'abstract', 'interface', 'enum'] as UmlNodeKind[]).map((kind) => (
-              <button className="palette-item" draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
+              <button className={`palette-item palette-item--${kind}`} draggable key={kind} onDragStart={(event) => onDragStart(event, kind)}>
                 <MousePointer2 size={14} />
                 {kind}
               </button>
@@ -904,16 +909,60 @@ function Editor() {
             <InspectorChevron open={!inspectorCollapsed.relations} /> Relation
           </label>
           <div className="inspector-section-body">
-            {relationOptions.map((rel) => (
-              <button
-                key={rel}
-                className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
-                onClick={() => setSelectedRelation(rel)}
-              >
-                <MousePointer2 size={14} />
-                {rel}
-              </button>
-            ))}
+            <div className="relation-group">
+              <span className="relation-group-label">is-a</span>
+              {(['inheritance', 'implementation'] as UmlRelationKind[]).map((rel) => (
+                <button
+                  key={rel}
+                  className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
+                  onClick={() => setSelectedRelation(rel)}
+                >
+                  <span className="relation-icon">
+                    <svg width="20" height="12" viewBox="0 0 20 12">
+                      <line x1="0" y1="6" x2="14" y2="6" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M 14 1 L 20 6 L 14 11 Z" fill={rel === 'implementation' ? 'none' : '#fff'} stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </span>
+                  {rel}
+                </button>
+              ))}
+            </div>
+            <div className="relation-group">
+              <span className="relation-group-label">has-a</span>
+              {(['composition', 'aggregation'] as UmlRelationKind[]).map((rel) => (
+                <button
+                  key={rel}
+                  className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
+                  onClick={() => setSelectedRelation(rel)}
+                >
+                  <span className="relation-icon">
+                    <svg width="20" height="12" viewBox="0 0 20 12">
+                      <line x1="6" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M 0 6 L 6 1 L 12 6 L 6 11 Z" fill={rel === 'composition' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </span>
+                  {rel}
+                </button>
+              ))}
+            </div>
+            <div className="relation-group">
+              <span className="relation-group-label">other</span>
+              {(['association', 'dependency'] as UmlRelationKind[]).map((rel) => (
+                <button
+                  key={rel}
+                  className={`palette-item ${selectedRelation === rel ? 'palette-item--active' : ''}`}
+                  onClick={() => setSelectedRelation(rel)}
+                >
+                  <span className="relation-icon">
+                    <svg width="20" height="12" viewBox="0 0 20 12">
+                      <line x1="0" y1="6" x2="16" y2="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray={rel === 'dependency' ? '3 2' : 'none'} />
+                      <path d="M 16 2 L 20 6 L 16 10" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </span>
+                  {rel}
+                </button>
+              ))}
+            </div>
             {selectedRelation && selectedNodeId && (
               <button onClick={startRelation}>Link selected to…</button>
             )}

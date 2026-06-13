@@ -298,6 +298,19 @@ export const moveProject = async (id: string, folderId: string | null): Promise<
   if (error) throw error;
 };
 
+export const duplicateProject = async (source: DiagramSnapshot): Promise<DiagramSnapshot> => {
+  const newId = crypto.randomUUID();
+  const duplicate: DiagramSnapshot = {
+    ...source,
+    id: newId,
+    name: source.name + ' (copy)',
+    nodes: JSON.parse(JSON.stringify(source.nodes)),
+    edges: JSON.parse(JSON.stringify(source.edges)),
+    updatedAt: new Date().toISOString(),
+  };
+  return saveDiagram(duplicate);
+};
+
 export const loadLocalDiagram = (): DiagramSnapshot | null => {
   const raw = localStorage.getItem('uml:last-project');
   return raw ? (JSON.parse(raw) as DiagramSnapshot) : null;
