@@ -642,6 +642,86 @@ label {
   min-height: 18px;
 }
 
+/* ── UML Zone ────────────────────────────────────── */
+.uml-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  position: relative;
+  font-size: 12px;
+}
+.uml-zone.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.uml-zone.resizing {
+  user-select: none;
+  pointer-events: none;
+}
+.uml-zone__header {
+  background: var(--accent);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  min-height: 28px;
+  cursor: default;
+}
+.uml-zone__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uml-zone__name-input {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 4px;
+  border: 1px solid #fff;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  min-height: auto;
+  width: 100%;
+}
+.uml-zone__count {
+  background: rgba(255,255,255,0.25);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.uml-zone__body {
+  flex: 1;
+  padding: 8px;
+  overflow: hidden;
+}
+.uml-zone__drop-hint {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 20px 0;
+  opacity: 0.6;
+}
+.uml-zone__resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border: 1px solid var(--panel);
+  border-radius: 2px;
+  z-index: 10;
+}
+.uml-zone__resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
+.uml-zone__resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
+.uml-zone__resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.uml-zone__resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
+
 /* ── Inspector ──────────────────────────────────── */
 .inspector {
   background: var(--panel);
@@ -703,6 +783,7 @@ label {
 .palette-item--interface { border-left: 3px solid var(--node-interface); }
 .palette-item--abstract { border-left: 3px solid var(--node-abstract); }
 .palette-item--enum { border-left: 3px solid var(--node-enum); }
+.palette-item--zone { border-left: 3px dashed var(--accent); }
 
 .palette-item--active {
   background: var(--accent-soft);
@@ -795,7 +876,7 @@ label {
   transform: translateX(-50%);
 }
 .react-flow__handle-top .uml-handle-dot {
-  top: 6px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -812,7 +893,7 @@ label {
   transform: translateX(-50%);
 }
 .react-flow__handle-bottom .uml-handle-dot {
-  bottom: 6px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -829,7 +910,7 @@ label {
   transform: translateY(-50%);
 }
 .react-flow__handle-left .uml-handle-dot {
-  left: 6px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -846,7 +927,7 @@ label {
   transform: translateY(-50%);
 }
 .react-flow__handle-right .uml-handle-dot {
-  right: 6px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
 }

@@ -1,5 +1,10 @@
 import type { UmlEdge, UmlMember, UmlNode } from '../../types/uml';
 
+type AnyNode = { type?: string; data?: Record<string, unknown> };
+
+const isUmlNode = (n: AnyNode): n is UmlNode =>
+  n.type === 'umlNode' && n.data !== undefined && 'fields' in (n.data as Record<string, unknown>);
+
 const visibilityKeyword = {
   public: 'public',
   private: 'private',
@@ -61,5 +66,7 @@ const renderNode = (node: UmlNode, nodes: UmlNode[], edges: UmlEdge[]) => {
   return `${packageLine}public ${abstractModifier}${declarationKind} ${name}${extendsClause}${implementsClause} {\n${body.join('\n')}\n}`;
 };
 
-export const generateJavaCode = (nodes: UmlNode[], edges: UmlEdge[]) =>
-  nodes.map((node) => `// ${node.data.name}.java\n${renderNode(node, nodes, edges)}`).join('\n\n');
+export const generateJavaCode = (nodes: AnyNode[], edges: UmlEdge[]) => {
+  const umlNodes = nodes.filter(isUmlNode);
+  return umlNodes.map((node) => `// ${node.data.name}.java\n${renderNode(node, umlNodes, edges)}`).join('\n\n');
+};

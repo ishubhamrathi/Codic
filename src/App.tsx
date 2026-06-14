@@ -17,18 +17,19 @@ import '@xyflow/react/dist/style.css';
 import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid, Pen, Keyboard } from 'lucide-react';
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
-import { createMember, createUmlNode } from './lib/umlFactory';
+import { createMember, createUmlNode, createUmlZone } from './lib/umlFactory';
 import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadProjectById, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, type FolderData } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
+import { UmlZoneNode } from './component/UmlZoneNode';
 import { AuthPage } from './component/Auth';
 import { ProjectExplorer } from './component/ProjectExplorer';
 import { CreateProjectModal } from './component/CreateProjectModal';
 import { FreeDrawCanvas } from './component/FreeDrawCanvas';
 import { ExcalidrawCanvas } from './component/ExcalidrawCanvas';
 import { InputModal } from './component/Dialogs';
-import type { DiagramSnapshot, ProjectType, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind } from './types/uml';
+import type { DiagramSnapshot, ProjectType, UmlEdge, UmlNode, UmlNodeData, UmlNodeKind, UmlRelationKind, UmlZone } from './types/uml';
 import { InheritanceEdge } from './component/edges/InheritanceEdge';
 import { CompositionEdge } from './component/edges/CompositionEdge';
 import { ImplementationEdge } from './component/edges/ImplementationEdge';
@@ -72,7 +73,7 @@ const initialEdges: UmlEdge[] = [
   },
 ];
 
-const nodeTypes = { umlNode: UmlNodeCard };
+const nodeTypes = { umlNode: UmlNodeCard, umlZone: UmlZoneNode };
 const edgeTypes = {
   inheritance: InheritanceEdge,
   composition: CompositionEdge,
@@ -114,26 +115,145 @@ function nodeWidth(d: UmlNodeData): number {
   return Math.max(160, Math.min(360, maxLen * 7.5 + 48));
 }
 
-function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
+type AnyNode = { id: string; parentId?: string; type?: string; position?: { x: number; y: number }; style?: Record<string, unknown>; data?: Record<string, unknown>; [k: string]: unknown };
+
+function sortNodes(nodes: AnyNode[]): AnyNode[] {
+  const sorted: AnyNode[] = [];
+  const remaining = [...nodes];
+  const added = new Set<string>();
+
+  const addNode = (node: AnyNode) => {
+    if (added.has(node.id)) return;
+    if (node.parentId) {
+      const parent = nodes.find((n) => n.id === node.parentId);
+      if (parent) addNode(parent);
+    }
+    sorted.push(node);
+    added.add(node.id);
+  };
+
+  while (remaining.length > 0) {
+    const node = remaining.shift()!;
+    addNode(node);
+  }
+
+  return sorted;
+}
+
+function resizeZoneToFitChildren(nodes: AnyNode[], zoneId: string): AnyNode[] {
+  const ZONE_PADDING = 40;
+  const HEADER_HEIGHT = 32;
+  const MIN_W = 200;
+  const MIN_H = 150;
+
+  const zone = nodes.find((n) => n.id === zoneId && n.type === 'umlZone');
+  if (!zone) return nodes;
+
+  const children = nodes.filter((n) => (n as any).parentId === zoneId && n.type === 'umlNode');
+  if (children.length === 0) return nodes;
+
+  let maxRight = 0;
+  let maxBottom = 0;
+  for (const child of children) {
+    const cw = ((child as any).measured?.width ?? 160);
+    const ch = ((child as any).measured?.height ?? 120);
+    const cx = (child.position?.x ?? 0);
+    const cy = (child.position?.y ?? 0);
+    if (cx + cw > maxRight) maxRight = cx + cw;
+    if (cy + ch > maxBottom) maxBottom = cy + ch;
+  }
+
+  const newW = Math.max(MIN_W, maxRight + ZONE_PADDING);
+  const newH = Math.max(MIN_H, maxBottom + HEADER_HEIGHT + ZONE_PADDING);
+
+  const curW = (zone.style as any)?.width ?? 400;
+  const curH = (zone.style as any)?.height ?? 300;
+  if (newW <= curW && newH <= curH) return nodes;
+
+  return nodes.map((n) =>
+    n.id === zoneId
+      ? { ...n, style: { ...n.style, width: newW, height: newH } }
+      : n
+  );
+}
+
+const GAP_X = 60;
+const GAP_Y = 80;
+const ZONE_PAD = 40;
+const ZONE_HEADER = 36;
+
+function autoArrange(nodes: (UmlNode | UmlZone)[], edges: UmlEdge[]): (UmlNode | UmlZone)[] {
   if (nodes.length === 0) return nodes;
 
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const children = new Map<string, Set<string>>();
-  const parents = new Map<string, Set<string>>();
+  const edgesBySource = new Map<string, UmlEdge[]>();
+  const edgesByTarget = new Map<string, UmlEdge[]>();
+  for (const e of edges) {
+    if (!edgesBySource.has(e.source)) edgesBySource.set(e.source, []);
+    edgesBySource.get(e.source)!.push(e);
+    if (!edgesByTarget.has(e.target)) edgesByTarget.set(e.target, []);
+    edgesByTarget.get(e.target)!.push(e);
+  }
 
-  nodes.forEach((n) => {
-    children.set(n.id, new Set());
-    parents.set(n.id, new Set());
-  });
+  const isZone = (n: UmlNode | UmlZone): n is UmlZone => n.type === 'umlZone';
 
-  edges.forEach((e) => {
-    if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
-      children.get(e.source)!.add(e.target);
-      parents.get(e.target)!.add(e.source);
+  const result: (UmlNode | UmlZone)[] = [];
+
+  const topLevel = nodes.filter((n) => !n.parentId);
+  const childOf = new Map<string, (UmlNode | UmlZone)[]>();
+  for (const n of nodes) {
+    if (n.parentId) {
+      if (!childOf.has(n.parentId)) childOf.set(n.parentId, []);
+      childOf.get(n.parentId)!.push(n);
     }
+  }
+
+  const zoneChildren = new Map<string, UmlNode[]>();
+  const freeNodes: UmlNode[] = [];
+  for (const n of nodes) {
+    if (isZone(n)) continue;
+    if (n.parentId && isZone(nodeMap.get(n.parentId)!)) {
+      if (!zoneChildren.has(n.parentId)) zoneChildren.set(n.parentId, []);
+      zoneChildren.get(n.parentId)!.push(n as UmlNode);
+    } else if (!n.parentId) {
+      freeNodes.push(n as UmlNode);
+    }
+  }
+
+  const allArrangeable = [...freeNodes, ...nodes.filter(isZone)];
+
+  const nodeMapA = new Map(allArrangeable.map((n) => [n.id, n]));
+  const childrenA = new Map<string, Set<string>>();
+  const parentsA = new Map<string, Set<string>>();
+  allArrangeable.forEach((n) => {
+    childrenA.set(n.id, new Set());
+    parentsA.set(n.id, new Set());
   });
 
-  const roots = nodes.filter((n) => parents.get(n.id)!.size === 0);
+  for (const e of edges) {
+    const src = nodeMapA.has(e.source) ? e.source : null;
+    const tgt = nodeMapA.has(e.target) ? e.target : null;
+    if (src && tgt) {
+      childrenA.get(src)!.add(tgt);
+      parentsA.get(tgt)!.add(src);
+    }
+    if (src && !tgt) {
+      const targetNode = nodeMap.get(e.target);
+      if (targetNode && targetNode.parentId && nodeMapA.has(targetNode.parentId)) {
+        childrenA.get(src)!.add(targetNode.parentId);
+        parentsA.get(targetNode.parentId)!.add(src);
+      }
+    }
+    if (!src && tgt) {
+      const sourceNode = nodeMap.get(e.source);
+      if (sourceNode && sourceNode.parentId && nodeMapA.has(sourceNode.parentId)) {
+        childrenA.get(sourceNode.parentId)!.add(tgt);
+        parentsA.get(tgt)!.add(sourceNode.parentId);
+      }
+    }
+  }
+
+  const roots = allArrangeable.filter((n) => parentsA.get(n.id)!.size === 0);
   const visited = new Set<string>();
   const levels: string[][] = [];
 
@@ -144,7 +264,7 @@ function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
       const next: string[] = [];
       for (const id of queue) {
         visited.add(id);
-        for (const child of children.get(id) ?? []) {
+        for (const child of childrenA.get(id) ?? []) {
           if (!visited.has(child)) {
             next.push(child);
           }
@@ -156,49 +276,146 @@ function autoArrange(nodes: UmlNode[], edges: UmlEdge[]): UmlNode[] {
 
   bfs(roots.map((n) => n.id));
 
-  const unvisited = nodes.filter((n) => !visited.has(n.id));
+  const unvisited = allArrangeable.filter((n) => !visited.has(n.id));
   if (unvisited.length > 0) {
     bfs(unvisited.map((n) => n.id));
   }
 
-  const GAP_X = 60;
-  const GAP_Y = 80;
+  function arrangeChildrenInsideZone(zone: UmlZone): UmlNode[] {
+    const children = zoneChildren.get(zone.id) ?? [];
+    if (children.length === 0) return [];
 
-  const arranged = new Map<string, { x: number; y: number }>();
+    const childEdges: UmlEdge[] = [];
+    for (const e of edges) {
+      if (nodeMap.has(e.source) && nodeMap.has(e.target)) {
+        const sNode = nodeMap.get(e.source)!;
+        const tNode = nodeMap.get(e.target)!;
+        const sInZone = sNode.parentId === zone.id;
+        const tInZone = tNode.parentId === zone.id;
+        if (sInZone && tInZone) childEdges.push(e);
+      }
+    }
+
+    const cMap = new Map<string, Set<string>>();
+    const pMap = new Map<string, Set<string>>();
+    children.forEach((n) => {
+      cMap.set(n.id, new Set());
+      pMap.set(n.id, new Set());
+    });
+    for (const e of childEdges) {
+      if (cMap.has(e.source) && cMap.has(e.target)) {
+        cMap.get(e.source)!.add(e.target);
+        pMap.get(e.target)!.add(e.source);
+      }
+    }
+
+    const cRoots = children.filter((n) => pMap.get(n.id)!.size === 0);
+    const cVisited = new Set<string>();
+    const cLevels: string[][] = [];
+
+    function cBfs(startIds: string[]) {
+      let queue = startIds;
+      while (queue.length > 0) {
+        cLevels.push([...queue]);
+        const next: string[] = [];
+        for (const id of queue) {
+          cVisited.add(id);
+          for (const cid of cMap.get(id) ?? []) {
+            if (!cVisited.has(cid)) next.push(cid);
+          }
+        }
+        queue = next;
+      }
+    }
+
+    cBfs(cRoots.map((n) => n.id));
+    const cUnvisited = children.filter((n) => !cVisited.has(n.id));
+    if (cUnvisited.length > 0) cBfs(cUnvisited.map((n) => n.id));
+
+    const arranged = new Map<string, { x: number; y: number }>();
+    let cy = ZONE_HEADER + 10;
+    for (const level of cLevels) {
+      let levelMaxH = 0;
+      let totalW = 0;
+      const widths = level.map((id) => {
+        const nd = nodeMap.get(id)! as UmlNode;
+        const w = nodeWidth(nd.data as UmlNodeData);
+        totalW += w;
+        return w;
+      });
+      totalW += (level.length - 1) * 20;
+      let cx = ZONE_PAD;
+      level.forEach((id, idx) => {
+        const nd = nodeMap.get(id)! as UmlNode;
+        const w = widths[idx];
+        const h = nodeHeight(nd.data as UmlNodeData);
+        if (h > levelMaxH) levelMaxH = h;
+        arranged.set(id, { x: cx, y: cy });
+        cx += w + 20;
+      });
+      cy += levelMaxH + 20;
+    }
+
+    const zoneW = Math.max(300, arranged.size > 0
+      ? Math.max(...[...arranged.entries()].map(([id, pos]) => {
+          const nd = nodeMap.get(id)! as UmlNode;
+          return pos.x + nodeWidth(nd.data as UmlNodeData) + ZONE_PAD;
+        }))
+      : 300);
+    const zoneH = Math.max(200, cy + 20);
+
+    const zoneIdx = result.findIndex((n) => n.id === zone.id);
+    if (zoneIdx >= 0) {
+      result[zoneIdx] = { ...zone, style: { ...zone.style, width: zoneW, height: zoneH } };
+    }
+
+    return children.map((n) => {
+      const pos = arranged.get(n.id);
+      return pos ? { ...n, position: pos } : n;
+    });
+  }
 
   let currentY = 0;
-
-  levels.forEach((level) => {
+  for (const level of levels) {
     let levelMaxH = 0;
     let totalW = 0;
 
-    const widths = level.map((id) => {
-      const d = nodeMap.get(id)!.data;
+    const sizes = level.map((id) => {
+      const node = nodeMapA.get(id)!;
+      if (isZone(node)) {
+        const zw = (node.style as any)?.width ?? 400;
+        const zh = (node.style as any)?.height ?? 300;
+        totalW += zw;
+        return { w: zw, h: zh };
+      }
+      const d = node.data as UmlNodeData;
       const w = nodeWidth(d);
+      const h = nodeHeight(d);
       totalW += w;
-      return w;
+      return { w, h };
     });
 
     totalW += (level.length - 1) * GAP_X;
     let x = -totalW / 2;
 
     level.forEach((id, posIdx) => {
-      const d = nodeMap.get(id)!.data;
-      const w = widths[posIdx];
-      const h = nodeHeight(d);
+      const node = nodeMapA.get(id)!;
+      const { w, h } = sizes[posIdx];
       if (h > levelMaxH) levelMaxH = h;
 
-      arranged.set(id, { x, y: currentY });
+      result.push({ ...node, position: { x, y: currentY } });
       x += w + GAP_X;
     });
 
     currentY += levelMaxH + GAP_Y;
-  });
+  }
 
-  return nodes.map((n) => {
-    const pos = arranged.get(n.id);
-    return pos ? { ...n, position: pos } : n;
-  });
+  for (const zone of result.filter(isZone)) {
+    const arrangedChildren = arrangeChildrenInsideZone(zone);
+    result.push(...arrangedChildren);
+  }
+
+  return result;
 }
 
 function ExplorerIcon() {
@@ -243,7 +460,7 @@ function Editor() {
   const [projectId, setProjectId] = useState<string>(crypto.randomUUID());
   const [projectFolderId, setProjectFolderId] = useState<string | undefined>(undefined);
   const [projectName, setProjectName] = useState('Untitled UML Project');
-  const [nodes, setNodes, onNodesChange] = useNodesState<UmlNode>(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<UmlNode | UmlZone>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<UmlEdge>(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string>(initialNodes[0].id);
   const [selectedRelation, setSelectedRelation] = useState<UmlRelationKind>('association');
@@ -267,9 +484,12 @@ function Editor() {
     textToVisual: false,
     code: true,
     nodes: false,
+    zones: false,
     relations: false,
   });
   const [relationModalOpen, setRelationModalOpen] = useState(false);
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
   const [projectType, setProjectType] = useState<ProjectType>('uml');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalFolderId, setCreateModalFolderId] = useState<string | undefined>(undefined);
@@ -307,7 +527,7 @@ function Editor() {
     setStatus(`Relation: ${selectedRelation} added`);
   };
 
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId && node.type === 'umlNode') as UmlNode | undefined;
   const generatedCode = useMemo(() => generateJavaCode(nodes, edges), [nodes, edges]);
 
   useEffect(() => {
@@ -481,14 +701,73 @@ function Editor() {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const onZoneDragStart = (event: DragEvent<HTMLButtonElement>) => {
+    event.dataTransfer.setData('application/uml-zone-kind', 'zone');
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const zoneKind = event.dataTransfer.getData('application/uml-zone-kind');
+    if (zoneKind) {
+      const newZone = createUmlZone(screenToFlowPosition({ x: event.clientX, y: event.clientY }), nodes.filter(n => n.type === 'umlZone').length + 1);
+      setNodes((current) => current.concat(newZone));
+      return;
+    }
     const kind = event.dataTransfer.getData('application/uml-node-kind') as UmlNodeKind;
     if (!kind) return;
     const newNode = createUmlNode(kind, screenToFlowPosition({ x: event.clientX, y: event.clientY }), nodes.length + 1);
     setNodes((current) => current.concat(newNode));
     setSelectedNodeId(newNode.id);
   };
+
+  const onNodeDragStop = useCallback((_: any, node: any) => {
+    if (node.type !== 'umlNode') return;
+    const allNodes = nodesRef.current;
+    const zones = allNodes.filter((n): n is UmlZone => n.type === 'umlZone');
+    const nodeW = (node.measured?.width ?? 160);
+    const nodeH = (node.measured?.height ?? 120);
+    const nodeCx = node.position.x + nodeW / 2;
+    const nodeCy = node.position.y + nodeH / 2;
+
+    let placedInZone = false;
+    for (const zone of zones) {
+      const zw = (zone.style as any)?.width ?? 400;
+      const zh = (zone.style as any)?.height ?? 300;
+      const zLeft = zone.position.x;
+      const zTop = zone.position.y;
+      const zRight = zLeft + zw;
+      const zBottom = zTop + zh;
+
+      if (nodeCx >= zLeft && nodeCx <= zRight && nodeCy >= zTop && nodeCy <= zBottom) {
+        const relX = node.position.x - zone.position.x;
+        const relY = node.position.y - zone.position.y;
+        setNodes((nds) => {
+          const updated = nds.map((n) =>
+            n.id === node.id
+              ? { ...n, parentId: zone.id, position: { x: relX, y: relY }, data: { ...n.data, packageName: zone.data.name } }
+              : n
+          );
+          return sortNodes(resizeZoneToFitChildren(updated, zone.id));
+        });
+        placedInZone = true;
+        break;
+      }
+    }
+
+    if (!placedInZone) {
+      const prevParentId = (node as any).parentId;
+      setNodes((nds) => {
+        const updated = nds.map((n) =>
+          n.id === node.id && prevParentId
+            ? { ...n, parentId: undefined, data: { ...n.data, packageName: undefined } }
+            : n
+        );
+        if (prevParentId) return sortNodes(resizeZoneToFitChildren(updated, prevParentId));
+        return updated;
+      });
+    }
+  }, [setNodes]);
 
   const updateSelectedNode = (patch: Partial<UmlNodeData>) => {
     if (!selectedNode) return;
@@ -616,16 +895,20 @@ function Editor() {
     setExcalidrawDocument({ elements, appState });
   };
 
+  const onNodeClickHandler = useCallback((_: any, node: any) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
   const isUml = projectType === 'uml';
   const isExcalidraw = projectType === 'excalidraw';
 
-  const handleNodesChange = (changes: NodeChange<UmlNode>[]) => {
+  const handleNodesChange = useCallback((changes: NodeChange<UmlNode | UmlZone>[]) => {
     onNodesChange(changes);
-  };
+  }, [onNodesChange]);
 
-  const handleEdgesChange = (changes: EdgeChange<UmlEdge>[]) => {
+  const handleEdgesChange = useCallback((changes: EdgeChange<UmlEdge>[]) => {
     onEdgesChange(changes);
-  };
+  }, [onEdgesChange]);
 
   if (dataLoading) {
     return (
@@ -756,7 +1039,8 @@ function Editor() {
               onNodesChange={handleNodesChange}
               onEdgesChange={handleEdgesChange}
               onConnect={onConnect}
-              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onNodeClick={onNodeClickHandler}
+              onNodeDragStop={onNodeDragStop}
               connectionLineType="straight"
               connectionMode="loose"
               fitView
@@ -797,8 +1081,9 @@ function Editor() {
           <label className="inspector-section-header" onClick={() => toggleInspectorSection('inspector')}>
             <InspectorChevron open={!inspectorCollapsed.inspector} /> Inspector
           </label>
+          {!inspectorCollapsed.inspector && (
           <div className="inspector-section-body">
-            {selectedNode ? (
+            {selectedNode && 'fields' in selectedNode.data ? (
               <>
                 <input value={selectedNode.data.name} onChange={(event) => updateSelectedNode({ name: event.target.value })} />
                 <select
@@ -855,6 +1140,7 @@ function Editor() {
               <p>Select a node to edit it.</p>
             )}
           </div>
+          )}
         </section>
         )}
 
@@ -877,6 +1163,7 @@ function Editor() {
             <InspectorChevron open={!inspectorCollapsed.code} />
             <Code2 size={14} /> Java Code
           </label>
+          {!inspectorCollapsed.code && (
           <div className="inspector-section-body">
             <pre>{generatedCode}</pre>
             <button onClick={() => navigator.clipboard.writeText(generatedCode)}>
@@ -884,6 +1171,7 @@ function Editor() {
             </button>
             <button onClick={exportJson}>Export JSON</button>
           </div>
+          )}
         </section>
         )}
 
@@ -899,6 +1187,20 @@ function Editor() {
                 {kind}
               </button>
             ))}
+          </div>
+        </section>
+        )}
+
+        {isUml && (
+        <section className={`inspector-section${inspectorCollapsed.zones ? ' collapsed' : ''}`}>
+          <label className="inspector-section-header" onClick={() => toggleInspectorSection('zones')}>
+            <InspectorChevron open={!inspectorCollapsed.zones} /> Zones
+          </label>
+          <div className="inspector-section-body">
+            <button className="palette-item palette-item--zone" draggable onDragStart={onZoneDragStart}>
+              <Shapes size={14} />
+              Zone
+            </button>
           </div>
         </section>
         )}

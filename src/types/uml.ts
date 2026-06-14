@@ -39,6 +39,13 @@ export type UmlEdgeData = {
 
 export type UmlEdge = Edge<UmlEdgeData>;
 
+export type UmlZoneData = {
+  kind: 'zone';
+  name: string;
+};
+
+export type UmlZone = Node<UmlZoneData, 'umlZone'>;
+
 export type ProjectType = 'uml' | 'freedraw' | 'excalidraw';
 
 export type DiagramSnapshot = {
@@ -46,7 +53,7 @@ export type DiagramSnapshot = {
   folderId?: string;
   name: string;
   type?: ProjectType;
-  nodes: UmlNode[];
+  nodes: (UmlNode | UmlZone)[];
   edges: UmlEdge[];
   tldrawDocument?: Record<string, unknown> | null;
   excalidrawDocument?: unknown;

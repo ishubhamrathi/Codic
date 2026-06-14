@@ -1,5 +1,5 @@
 import { createId } from './ids';
-import type { UmlMember, UmlNode, UmlNodeData, UmlNodeKind } from '../types/uml';
+import type { UmlMember, UmlNode, UmlNodeData, UmlNodeKind, UmlZone } from '../types/uml';
 
 export const visibilitySymbol = {
   public: '+',
@@ -54,4 +54,15 @@ export const createUmlNode = (
   type: 'umlNode',
   position,
   data: createNodeData(kind, index),
+});
+
+export const createUmlZone = (
+  position: { x: number; y: number },
+  index: number,
+): UmlZone => ({
+  id: createId('zone'),
+  type: 'umlZone',
+  position,
+  style: { width: 400, height: 300 },
+  data: { kind: 'zone', name: `Package${index}` },
 });
