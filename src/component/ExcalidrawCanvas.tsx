@@ -260,7 +260,10 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
   return (
     <div className={`excalidraw-canvas ${cursorClass}`}>
       <Excalidraw
-        excalidrawAPI={(api: ExcalidrawAPI) => { excalidrawAPIRef.current = api; }}
+        excalidrawAPI={(api: ExcalidrawAPI) => {
+          excalidrawAPIRef.current = api;
+          try { api.updateScene({ appState: { viewBackgroundColor } }); } catch { /* */ }
+        }}
         initialData={initialData as never}
         onChange={handleChange}
         theme={theme}
