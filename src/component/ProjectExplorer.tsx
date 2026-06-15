@@ -113,12 +113,13 @@ type Props = {
   onLoadProject: (project: DiagramSnapshot) => void;
   onCreateProject: (folderId?: string) => void;
   onProjectRenamed?: (id: string, name: string) => void;
+  onProjectDeleted?: (id: string) => void;
   currentProjectId?: string;
   recentProjectId?: string;
   refreshKey?: number;
 };
 
-export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenamed, currentProjectId, recentProjectId, refreshKey }: Props) {
+export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenamed, onProjectDeleted, currentProjectId, recentProjectId, refreshKey }: Props) {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [projects, setProjects] = useState<DiagramSnapshot[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -194,7 +195,15 @@ export function ProjectExplorer({ onLoadProject, onCreateProject, onProjectRenam
         setProjects((prev) => prev.filter((p) => p.folderId !== id));
       } else {
         await deleteProject(id);
-        setProjects((prev) => prev.filter((p) => p.id !== id));
+        const remaining = projects.filter((p) => p.id !== id);
+        setProjects(remaining);
+        if (id === currentProjectId) {
+          if (remaining.length > 0) {
+            onLoadProject(remaining[0]);
+          } else {
+            onProjectDeleted?.(id);
+          }
+        }
       }
     } catch (e) {
       console.warn('Delete failed:', e);

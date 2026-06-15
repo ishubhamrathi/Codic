@@ -981,6 +981,19 @@ function Editor() {
             onLoadProject={loadProject}
             onCreateProject={handleCreateProject}
             onProjectRenamed={(_id, name) => setProjectName(name)}
+            onProjectDeleted={() => {
+              const id = crypto.randomUUID();
+              setProjectId(id);
+              setProjectName('Untitled Drawing');
+              setProjectType('excalidraw');
+              setNodes([]);
+              setEdges([]);
+              setTldrawDocument(undefined);
+              setExcalidrawDocument(null);
+              setSelectedNodeId(undefined);
+              projectLoaded.current = true;
+              history.pushState(null, '', `?project=${id}`);
+            }}
             currentProjectId={projectId}
             recentProjectId={recentProjectId}
             refreshKey={explorerRefreshKey}
