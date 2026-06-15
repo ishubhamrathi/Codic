@@ -37,6 +37,7 @@ import { AggregationEdge } from './component/edges/AggregationEdge';
 import { AssociationEdge } from './component/edges/AssociationEdge';
 import { DependencyEdge } from './component/edges/DependencyEdge';
 import { ErrorBoundary } from './component/ErrorBoundary';
+import { Seo } from './component/Seo';
 
 const initialNodes: UmlNode[] = [
   {
@@ -1443,18 +1444,27 @@ function AppContent() {
   if (loading) {
     return (
       <div className="loading-screen">
+        <Seo />
         <p>Loading...</p>
       </div>
     );
   }
 
   if (!user && isSupabaseConfigured) {
-    return <AuthPage />;
+    return (
+      <>
+        <Seo title="Sign In - Codic" description="Sign in to Codic to save and manage your UML diagrams in the cloud." />
+        <AuthPage />
+      </>
+    );
   }
 
   return (
-    <ReactFlowProvider>
-      <Editor />
-    </ReactFlowProvider>
+    <>
+      <Seo />
+      <ReactFlowProvider>
+        <Editor />
+      </ReactFlowProvider>
+    </>
   );
 }
