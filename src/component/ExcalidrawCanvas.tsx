@@ -87,25 +87,18 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
     }, 1500);
   }, [onDocumentChange]);
 
-  const viewBackgroundColor = theme === 'dark' ? '#1a1612' : '#f5f0e8';
-
   const initialData = useMemo(() => {
     if (!excalidrawDocument) {
-      return { elements: [], appState: { collaborators: [], viewBackgroundColor } };
+      return { elements: [], appState: { collaborators: [] } };
     }
     const doc = excalidrawDocument as Record<string, unknown>;
     const elements = doc.elements;
     const savedAppState = (doc.appState ?? {}) as Record<string, unknown>;
     return {
       elements: Array.isArray(elements) ? elements : [],
-      appState: { collaborators: [], viewBackgroundColor, ...savedAppState },
+      appState: { collaborators: [], ...savedAppState },
     };
-  }, [viewBackgroundColor, excalidrawDocument]);
-
-  useEffect(() => {
-    if (!excalidrawAPIRef.current) return;
-    try { excalidrawAPIRef.current.updateScene({ appState: { viewBackgroundColor } }); } catch { /* */ }
-  }, [viewBackgroundColor]);
+  }, [excalidrawDocument]);
 
   const selectTool = useCallback((tool: string) => {
     setActiveTool(tool);
@@ -260,10 +253,7 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
   return (
     <div className={`excalidraw-canvas ${cursorClass}`}>
       <Excalidraw
-        excalidrawAPI={(api: ExcalidrawAPI) => {
-          excalidrawAPIRef.current = api;
-          try { api.updateScene({ appState: { viewBackgroundColor } }); } catch { /* */ }
-        }}
+        excalidrawAPI={(api: ExcalidrawAPI) => { excalidrawAPIRef.current = api; }}
         initialData={initialData as never}
         onChange={handleChange}
         theme={theme}
