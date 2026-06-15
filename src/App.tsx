@@ -727,8 +727,18 @@ function Editor() {
     const zones = allNodes.filter((n): n is UmlZone => n.type === 'umlZone');
     const nodeW = (node.measured?.width ?? 160);
     const nodeH = (node.measured?.height ?? 120);
-    const nodeCx = node.position.x + nodeW / 2;
-    const nodeCy = node.position.y + nodeH / 2;
+
+    let absX = node.position.x;
+    let absY = node.position.y;
+    if (node.parentId) {
+      const parent = allNodes.find((n) => n.id === node.parentId);
+      if (parent) {
+        absX += parent.position.x;
+        absY += parent.position.y;
+      }
+    }
+    const nodeCx = absX + nodeW / 2;
+    const nodeCy = absY + nodeH / 2;
 
     let placedInZone = false;
     for (const zone of zones) {
@@ -740,8 +750,12 @@ function Editor() {
       const zBottom = zTop + zh;
 
       if (nodeCx >= zLeft && nodeCx <= zRight && nodeCy >= zTop && nodeCy <= zBottom) {
-        const relX = node.position.x - zone.position.x;
-        const relY = node.position.y - zone.position.y;
+        if (node.parentId === zone.id) {
+          placedInZone = true;
+          break;
+        }
+        const relX = absX - zone.position.x;
+        const relY = absY - zone.position.y;
         setNodes((nds) => {
           const updated = nds.map((n) =>
             n.id === node.id
@@ -760,7 +774,7 @@ function Editor() {
       setNodes((nds) => {
         const updated = nds.map((n) =>
           n.id === node.id && prevParentId
-            ? { ...n, parentId: undefined, data: { ...n.data, packageName: undefined } }
+            ? { ...n, parentId: undefined, position: { x: absX, y: absY }, data: { ...n.data, packageName: undefined } }
             : n
         );
         if (prevParentId) return sortNodes(resizeZoneToFitChildren(updated, prevParentId));

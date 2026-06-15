@@ -5,15 +5,15 @@
   --text: #2c2416;
   --muted: #7a6f5f;
   --border: #d9d0c1;
-  --accent: #8b6914;
+  --accent: #6a5a22;
   --accent-soft: #f0e6cc;
   --danger: #b91c1c;
   --shadow: 0 14px 34px rgba(60, 40, 10, 0.08);
   --activity-bg: #ede8de;
-  --node-class: #3b82f6;
-  --node-interface: #10b981;
-  --node-abstract: #8b5cf6;
-  --node-enum: #f59e0b;
+  --node-class: #6888a8;
+  --node-interface: #589078;
+  --node-abstract: #7870a0;
+  --node-enum: #a89040;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -30,15 +30,15 @@
   --text: #e8e0d0;
   --muted: #a09080;
   --border: #3d3628;
-  --accent: #c9a84c;
+  --accent: #887838;
   --accent-soft: #3a3020;
   --danger: #ef4444;
   --shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
   --activity-bg: #1e1a14;
-  --node-class: #60a5fa;
-  --node-interface: #34d399;
-  --node-abstract: #a78bfa;
-  --node-enum: #fbbf24;
+  --node-class: #5a80a8;
+  --node-interface: #3a9068;
+  --node-abstract: #7a68b0;
+  --node-enum: #b09838;
 }
 
 * { box-sizing: border-box; }
@@ -499,7 +499,7 @@ label {
   background: var(--panel);
   border: 1.5px solid var(--border);
   border-radius: 6px;
-  min-width: 180px;
+  min-width: 140px;
   font-size: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   padding: 0;
@@ -511,7 +511,7 @@ label {
 .uml-node__header {
   background: var(--accent);
   color: #fff;
-  padding: 6px 10px;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -528,7 +528,7 @@ label {
 .uml-node__header--abstract { background: var(--node-abstract); }
 .uml-node__header--enum { background: var(--node-enum); }
 .uml-node__section {
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-top: 1px solid var(--border);
   font-family: "SF Mono", ui-monospace, Consolas, monospace;
   font-size: 11px;
@@ -852,11 +852,11 @@ label {
 /* Small dot on border */
 .uml-handle-dot {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--accent);
-  opacity: 0.5;
+  opacity: 0.6;
   transition: opacity 0.15s ease;
   pointer-events: none;
 }
