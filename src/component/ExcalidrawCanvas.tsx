@@ -100,7 +100,7 @@ export function ExcalidrawCanvas({ excalidrawDocument, onDocumentChange, theme =
       elements: Array.isArray(elements) ? elements : [],
       appState: { collaborators: [], viewBackgroundColor, ...savedAppState },
     };
-  }, [viewBackgroundColor]);
+  }, [viewBackgroundColor, excalidrawDocument]);
 
   useEffect(() => {
     if (!excalidrawAPIRef.current) return;

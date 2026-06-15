@@ -646,9 +646,10 @@ label {
 .uml-zone {
   border: 2px dashed var(--border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  background: var(--panel);
   position: relative;
   font-size: 12px;
+  z-index: 1;
 }
 .uml-zone.selected {
   border-color: var(--accent);

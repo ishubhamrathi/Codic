@@ -1069,6 +1069,7 @@ function Editor() {
           <div className="canvas">
             <ErrorBoundary>
               <ExcalidrawCanvas
+                key={projectId}
                 excalidrawDocument={excalidrawDocument}
                 onDocumentChange={handleExcalidrawChange}
                 theme={theme}

@@ -63,6 +63,6 @@ export const createUmlZone = (
   id: createId('zone'),
   type: 'umlZone',
   position,
-  style: { width: 400, height: 300 },
+  style: { width: 400, height: 300, zIndex: 1 },
   data: { kind: 'zone', name: `Package${index}` },
 });
