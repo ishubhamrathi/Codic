@@ -18,7 +18,7 @@ import { Code2, Download, MousePointer2, Save, Shapes, Sparkles, LayoutGrid, Pen
 import { generateJavaCode } from './lib/codegen/java';
 import { parseTextToNodes } from './lib/codegen/parser';
 import { createMember, createUmlNode, createUmlZone } from './lib/umlFactory';
-import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadProjectById, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, type FolderData } from './lib/supabase';
+import { isSupabaseConfigured, saveDiagram, loadUserProjects, loadProjectById, loadFolders, loadUserTheme, saveUserTheme, loadLocalDiagram, updatePassword, type FolderData } from './lib/supabase';
 import { AuthProvider } from './lib/AuthContext';
 import { useAuth } from './lib/useAuth';
 import { UmlNodeCard } from './component/UmlNodeCard';
@@ -496,6 +496,12 @@ function Editor() {
   const [createModalFolderId, setCreateModalFolderId] = useState<string | undefined>(undefined);
   const [tldrawDocument, setTldrawDocument] = useState<Record<string, unknown> | null | undefined>(undefined);
   const [excalidrawDocument, setExcalidrawDocument] = useState<unknown>(undefined);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
 
   const toggleInspectorSection = (key: string) => {
@@ -674,6 +680,37 @@ function Editor() {
     setTheme(next);
     document.documentElement.setAttribute('data-theme', next);
     await saveUserTheme(next);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    setPasswordError('');
+    setPasswordSuccess('');
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      setPasswordLoading(false);
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      setPasswordLoading(false);
+      return;
+    }
+    try {
+      await updatePassword(newPassword);
+      setPasswordSuccess('Password updated successfully!');
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordSuccess('');
+      }, 1500);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to update password');
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const userDisplayName = user?.user_metadata?.display_name
@@ -951,6 +988,69 @@ function Editor() {
           onCancel={() => setRelationModalOpen(false)}
         />
       )}
+      {showPasswordModal && (
+        <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px' }}>
+            <div className="modal-header">
+              <h3>Change Password</h3>
+              <button className="modal-close" onClick={() => setShowPasswordModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleChangePassword} style={{ padding: '0 20px 20px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="At least 6 characters"
+                  autoFocus
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--panel)', color: 'var(--text)' }}
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Re-enter your password"
+                  style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--panel)', color: 'var(--text)' }}
+                />
+              </div>
+              {passwordError && (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', color: 'var(--danger)', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div style={{ padding: '8px 12px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
+                  {passwordSuccess}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: passwordLoading ? 'not-allowed' : 'pointer',
+                  opacity: passwordLoading ? 0.7 : 1,
+                }}
+              >
+                {passwordLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Activity Bar - leftmost narrow strip */}
       <div className="activity-bar">
@@ -1021,6 +1121,13 @@ function Editor() {
                     <span className="theme-toggle__knob" />
                   </button>
                 </div>
+                <button className="panel-profile-signout" onClick={() => setShowPasswordModal(true)}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="7" width="10" height="8" rx="1" />
+                    <path d="M5 7V5a3 3 0 016 0v2" />
+                  </svg>
+                  Change Password
+                </button>
                 <button className="panel-profile-signout" onClick={signOut}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" />

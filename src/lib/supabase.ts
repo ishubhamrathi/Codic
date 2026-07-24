@@ -56,6 +56,24 @@ export const signInWithOAuth = async (provider: OAuthProvider) => {
   return data;
 };
 
+export const resetPassword = async (email: string) => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.auth.signInWithOtp({ email });
+  if (error) throw error;
+};
+
+export const verifyRecoveryOtp = async (email: string, token: string) => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) throw error;
+};
+
+export const updatePassword = async (newPassword: string) => {
+  if (!supabase) throw new Error('Supabase not configured');
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+};
+
 export const signOut = async () => {
   if (!supabase) throw new Error('Supabase not configured');
   const { error } = await supabase.auth.signOut();
